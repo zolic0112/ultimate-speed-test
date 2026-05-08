@@ -68,6 +68,10 @@ const I18N = (() => {
 
       // Share
       "share.text": "Ultimate Speed Test",
+      "share.card.title": "ULTIMATE / SPEED TEST",
+      "share.download": "下載",
+      "share.upload": "上傳",
+      "share.ping": "Ping",
     },
 
     en: {
@@ -122,6 +126,10 @@ const I18N = (() => {
       "grade.pending": "PENDING",
 
       "share.text": "Ultimate Speed Test",
+      "share.card.title": "ULTIMATE / SPEED TEST",
+      "share.download": "Download",
+      "share.upload": "Upload",
+      "share.ping": "Ping",
     },
 
     es: {
@@ -176,6 +184,10 @@ const I18N = (() => {
       "grade.pending": "PENDIENTE",
 
       "share.text": "Ultimate Speed Test",
+      "share.card.title": "ULTIMATE / SPEED TEST",
+      "share.download": "Descarga",
+      "share.upload": "Carga",
+      "share.ping": "Ping",
     },
 
     ja: {
@@ -230,6 +242,10 @@ const I18N = (() => {
       "grade.pending": "保留中",
 
       "share.text": "Ultimate Speed Test",
+      "share.card.title": "ULTIMATE / SPEED TEST",
+      "share.download": "ダウンロード",
+      "share.upload": "アップロード",
+      "share.ping": "Ping",
     },
   };
 

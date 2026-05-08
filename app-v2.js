@@ -33,12 +33,19 @@ function init() {
   };
 
   const setupLanguageSwitcher = () => {
+    const updateDocumentLang = (lang) => {
+      document.documentElement.lang = lang;
+      document.documentElement.setAttribute("data-lang", lang);
+    };
+
     const langs = I18N.getAll();
     const langBtn = document.createElement("button");
     langBtn.className = "v3-icon-btn";
     langBtn.id = "nav-lang";
     langBtn.setAttribute("aria-label", "Language");
     langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${I18N.getLang().toUpperCase()}</span>`;
+
+    updateDocumentLang(I18N.getLang());
 
     langBtn.addEventListener("click", () => {
       const currentLang = I18N.getLang();
@@ -47,6 +54,7 @@ function init() {
       const nextLang = langs[nextIndex];
       I18N.setLang(nextLang);
       langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${nextLang.toUpperCase()}</span>`;
+      updateDocumentLang(nextLang);
       applyTranslations();
     });
 

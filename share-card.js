@@ -103,7 +103,7 @@
     ctx.font = '500 18px "IBM Plex Mono", ui-monospace, monospace';
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    fillSpacedText(ctx, "ULTIMATE / SPEED TEST", W / 2, innerY + PADDING, 1.5);
+    fillSpacedText(ctx, I18N.get("share.card.title"), W / 2, innerY + PADDING, 1.5);
 
     // Tiny tick lines either side of the brand text — feels like a sci-fi HUD
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -155,17 +155,17 @@
       {
         value: results.download,
         unit: "Mbps",
-        label: "DOWNLOAD",
+        label: I18N.get("share.download").toUpperCase(),
       },
       {
         value: uploadBlocked && Number(results.upload) === 0 ? "N/A" : results.upload,
         unit: uploadBlocked && Number(results.upload) === 0 ? "" : "Mbps",
-        label: "UPLOAD",
+        label: I18N.get("share.upload").toUpperCase(),
       },
       {
         value: results.ping,
         unit: "ms",
-        label: "PING",
+        label: I18N.get("share.ping").toUpperCase(),
       },
     ];
 

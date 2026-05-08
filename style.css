@@ -22,6 +22,19 @@
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+/* Language-specific fonts */
+html[lang="zh-TW"],
+html[data-lang="zh-TW"] {
+    --font-display: "Space Grotesk", "Noto Sans TC", "Microsoft JhengHei", "-apple-system", "BlinkMacSystemFont", sans-serif;
+    --font-mono: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
+}
+
+html[lang="ja"],
+html[data-lang="ja"] {
+    --font-display: "Space Grotesk", "Noto Sans JP", "Hiragino Sans", "-apple-system", "BlinkMacSystemFont", sans-serif;
+    --font-mono: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -1912,6 +1925,16 @@ body[data-bp="mobile"] .v3-status-bar {
     padding: 0 56px;
     pointer-events: none;
 }
+/* CJK title optimization */
+html[lang="zh-TW"] .v3-idle-serif,
+html[data-lang="zh-TW"] .v3-idle-serif,
+html[lang="ja"] .v3-idle-serif,
+html[data-lang="ja"] .v3-idle-serif {
+    font-family: var(--font-display);
+    font-style: normal;
+    font-size: clamp(36px, 4.8vw, 56px);
+}
+
 .v3-idle-serif {
     font-family: var(--v3-font-serif);
     font-size: clamp(40px, 5.5vw, 64px);
@@ -2254,6 +2277,16 @@ body[data-bp="mobile"] .v3-testing-chips .v3-metric-chip {
     color: rgba(255, 255, 255, 0.5);
     margin-bottom: 12px;
 }
+/* CJK result headline optimization */
+html[lang="zh-TW"] .v3-result-headline,
+html[data-lang="zh-TW"] .v3-result-headline,
+html[lang="ja"] .v3-result-headline,
+html[data-lang="ja"] .v3-result-headline {
+    font-family: var(--font-display);
+    font-style: normal;
+    font-size: 38px;
+}
+
 .v3-result-headline {
     font-family: var(--v3-font-serif);
     font-size: 44px;
