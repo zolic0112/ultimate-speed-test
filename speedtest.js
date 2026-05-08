@@ -105,6 +105,10 @@ class SpeedTest {
       this.log("Download:", results.download.toFixed(1), "Mbps");
 
       this.emit("phase", { phase: "upload" });
+      // Probe upload endpoints once (Worker → /api/upload → __up). Without
+      // this, UP_URL stays at the constructor default and the /api/upload
+      // fallback never gets used when the Worker is unavailable.
+      await this._probeUploadEndpoint();
       results.upload = await this.measureUpload(10000);
       this.log("Upload:", results.upload.toFixed(1), "Mbps");
 
