@@ -70,20 +70,24 @@ button {
 }
 
 /* Canvases stacked full-bleed past the iOS home indicator.
-   Using negative insets equal to safe-area-inset-* forces the canvas
-   to physically extend beyond the safe area on all four sides — more
-   reliable than relying on 100dvh, which on some iOS PWA builds still
-   stops at the safe-area boundary. In normal browsers env() is 0 so
-   the negatives collapse and nothing changes. */
+   Negative top/left + explicit width/height = physical extension into
+   safe-area on all sides. (Canvas is a replaced element, so the
+   right/bottom + width:auto trick used for divs doesn't work here —
+   width:auto falls back to the canvas DOM attribute, breaking layout.)
+   In normal browsers env() is 0, so width = 100vw and height = 100dvh. */
 #bg,
 #medal-canvas {
     position: fixed;
     top: calc(-1 * env(safe-area-inset-top, 0px));
     left: calc(-1 * env(safe-area-inset-left, 0px));
-    right: calc(-1 * env(safe-area-inset-right, 0px));
-    bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
-    width: auto;
-    height: auto;
+    width: calc(
+        100vw + env(safe-area-inset-left, 0px) +
+            env(safe-area-inset-right, 0px)
+    );
+    height: calc(
+        100dvh + env(safe-area-inset-top, 0px) +
+            env(safe-area-inset-bottom, 0px)
+    );
     display: block;
 }
 #bg {
