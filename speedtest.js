@@ -16,12 +16,15 @@ class SpeedTest {
   constructor() {
     this.listeners = {};
     this.DOWN_URL = "https://speed.cloudflare.com/__down";
-    // Upload goes through our Cloudflare Worker which CORS-wraps + stream-forwards
-    // to /__up. Passthrough (not a JS drain loop) keeps throughput at wire speed.
-    // Allow override at runtime via window.UPLOAD_PROXY_URL.
+    // Default upload sink: same-origin Pages Function. Same-origin avoids
+    // CORS preflight overhead and (verified empirically) outperforms the
+    // standalone Cloudflare Worker proxy by >15x — the Worker buffered
+    // bodies before forwarding, hitting CPU time limits.
+    // Override at runtime via window.UPLOAD_PROXY_URL if you actually have
+    // a working external Worker.
     this.UP_URL =
       (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) ||
-      "https://ust-upload-proxy.liamz-dev.workers.dev";
+      "/api/upload";
     this.DOWN_STREAMS = 8;
     this.UP_STREAMS = 3;
     this.DOWN_BYTES = 200 * 1024 * 1024;
@@ -42,14 +45,12 @@ class SpeedTest {
   //   3. Cloudflare __up      – default, may be CORS-blocked in some environments
   async _probeUploadEndpoint() {
     const candidates = [
-      // 1. Dedicated Cloudflare Worker — runs on CF network, optimized for
-      //    high-throughput streaming drain. Best raw upload performance.
-      (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
-      // 2. Same-origin Pages Function / edge function — CORS-safe fallback.
-      //    Lower throughput than a dedicated Worker (Pages Functions have
-      //    tighter CPU/streaming limits) but always works on weak networks
-      //    where a cross-origin probe might time out.
+      // 1. Same-origin Pages Function — primary endpoint. No CORS preflight,
+      //    streaming drain runs at wire speed.
       "/api/upload",
+      // 2. External Worker — opt-in fallback only via window.UPLOAD_PROXY_URL.
+      //    Kept for hosts without functions support; expect lower throughput.
+      (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
     ].filter(Boolean);
 
     // Generous probe timeout — mobile / weak networks can take >2s for the

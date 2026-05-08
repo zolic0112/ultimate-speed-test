@@ -853,12 +853,12 @@
                 density: "minimal",
             }; /*EDITMODE-END*/
 
-            // Upload proxy — Cloudflare Worker running on CF's own network.
-            // Gives accurate results from any environment (Netlify, Viverse, local).
-            // speedtest.js probes this first; falls back to /api/upload (Netlify
-            // edge function), then to Cloudflare __up as last resort.
-            window.UPLOAD_PROXY_URL =
-                "https://ust-upload-proxy.liamz-dev.workers.dev";
+            // Upload sink: same-origin Cloudflare Pages Function at /api/upload.
+            // (Previous external Worker proxy was 15x slower — buffered bodies
+            // before forwarding, hit CPU time limits.)
+            // To opt back into an external Worker, uncomment and point this at
+            // a Worker that does true `body: request.body` streaming forward.
+            // window.UPLOAD_PROXY_URL = "https://your-worker.example.workers.dev";
         </script>
 
         <!-- importmap: lets the GLTFLoader/DRACOLoader ES-module resolve "three" from CDN -->
