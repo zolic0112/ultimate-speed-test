@@ -1,0 +1,30 @@
+plugins = []
+headers = []
+redirects = []
+
+[build]
+edge_functions = "C:\\Users\\chaohsu_chow\\OneDrive - HTC\\桌面\\vibe coding\\app tools\\ultimate speed test\\ultimate speed test-handoff\\ultimate-speed-test\\project\\app\\netlify\\edge-functions"
+publish = "C:\\Users\\chaohsu_chow\\OneDrive - HTC\\桌面\\vibe coding\\app tools\\ultimate speed test\\ultimate speed test-handoff\\ultimate-speed-test\\project\\app"
+publishOrigin = "config"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[edge_functions]]
+path = "/api/upload"
+function = "upload"
+
+[functions]
+
+[functions."*"]

@@ -1,0 +1,7 @@
+# Cloudflare Worker config — Ultimate Speed Test upload proxy
+name            = "ust-upload-proxy"
+main            = "worker.js"
+compatibility_date = "2024-11-01"
+
+# No KV, Durable Objects, or other bindings needed.
+# This worker only drains POST bodies and returns 200.

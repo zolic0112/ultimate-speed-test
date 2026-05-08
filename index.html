@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+        />
+        <title>Ultimate Speed Test</title>
+
+        <!-- PWA -->
+        <link rel="manifest" href="manifest.webmanifest" />
+        <meta name="theme-color" content="#000000" />
+        <meta name="color-scheme" content="dark" />
+        <link rel="icon" type="image/png" href="icon-192.png" />
+        <link rel="apple-touch-icon" href="icon-apple-180.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+        <meta name="apple-mobile-web-app-title" content="Speed Test" />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@200;300;400;500;700&family=IBM+Plex+Mono:wght@300;400;500&family=Bodoni+Moda:ital,wght@0,400;0,500;0,700&family=Cinzel:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="style.css" />
+
+        <script type="x-shader/x-fragment" id="frag">
+            #version 300 es
+            /*********
+             * Ultimate Speed Test — triple-phase particle shader
+             *   phase 0.0 = STARFIELD     (idle · sparse slow drift)
+             *   phase 1.0 = LIGHTSPEED    (testing · radial streaks)
+             *   phase 1.5 = BURST         (flash + shockwave ring)
+             *   phase 2.0 = EMBERS        (result · dim starfield + radial vignette)
+             * Values between are smoothly interpolated.
+             *********/
+            precision highp float;
+            out vec4 O;
+            uniform float time;
+            uniform vec2 resolution;
+            uniform float speed;
+            uniform float phase;       // continuous 0..2
+            uniform float burst;       // 0..1 single-shot intensity for flash+ring
+            uniform vec2 touch;
+            uniform int pointerCount;
+            #define FC gl_FragCoord.xy
+            #define R resolution
+            #define T time
+            #define PI 3.14159265
+            #define hue(a) (.6+.6*cos(6.3*(a)+vec3(0,83,21)))
+
+            float rnd(float a) {
+              vec2 p=fract(a*vec2(12.9898,78.233)); p+=dot(p,p*345.);
+              return fract(p.x*p.y);
+            }
+            float hash12(vec2 p){
+              vec3 p3 = fract(vec3(p.xyx) * .1031);
+              p3 += dot(p3, p3.yzx + 33.33);
+              return fract((p3.x + p3.y) * p3.z);
+            }
+
+            // -------- Lightspeed (testing) --------
+            vec3 lightspeed(vec2 uv, float intensity){
+              vec3 col = vec3(0);
+              float s = 2.4;
+              float a = atan(uv.x, uv.y);
+              float b = length(uv);
+              float boost = 1.0 + intensity * 3.0;
+              // ── Anti-kaleidoscope ──────────────────────────────────────
+              // The 5-slice radial repeat creates "mirror seams". Slow rotation
+              // makes the seams drift around the centre so they never sit in the
+              // same place — breaks the static kaleidoscope feel.
+              a += T * 0.1;
+              vec2 p = vec2(a*5./6.28318, .05/tan(b) + T*boost);
+              p = fract(p) - .5;
+              p *= s;
+              for (float i=.0; i++<20.;){
+                float a2 = rnd(i);
+                vec2 n = vec2(a2, fract(a2*34.56));
+                vec2 q = sin(n*(T+7.) + T*.5);
+                q += touch * 0.25 * float(pointerCount > 0 ? 1 : 0);
+                float d = dot(p-q, p-q);
+                col += (.00125 + intensity*.002) / d * hue(dot(p,p) + i*.125 + T);
+              }
+              return col;
+            }
+
+            // -------- Starfield (idle/result) --------
+            // Static stars that slowly drift + react to pointer. Colour palette is pulled
+            // from the lightspeed hue() function so the three phases feel like the same
+            // universe at different energies.
+            vec3 starfield(vec2 uv, float brightness, float warmMix){
+              vec3 col = vec3(0);
+              // pointer pull — very subtle parallax drag
+              vec2 pull = touch * 0.06 * float(pointerCount > 0 ? 1 : 0);
+              // 3 layers for parallax
+              for (float L = 0.; L < 3.; L++){
+                float scale = 2.0 + L * 2.2;
+                vec2 p = uv * scale + vec2(T * 0.004 * (L+1.), T * 0.003) + pull * (0.6 + L*0.4);
+                vec2 cell = floor(p);
+                vec2 fcel = fract(p);
+                // star per cell
+                float r = hash12(cell);
+                if (r < 0.72) continue;                 // sparse
+                vec2 starPos = vec2(hash12(cell + 1.3), hash12(cell + 7.7));
+                // ripple toward pointer — tiny nudge
+                vec2 toP = touch - (cell + starPos)/scale;
+                float pd = dot(toP, toP);
+                starPos += toP * 0.04 / (1.0 + pd*8.0) * float(pointerCount > 0 ? 1 : 0);
+
+                float d = length(fcel - starPos);
+                float size = 0.012 + (r - 0.72) * 0.03;
+                float tw = 0.7 + 0.3 * sin(T * 0.6 + r * 40.);
+                float s = smoothstep(size, 0.0, d) * tw;
+                float halo = smoothstep(size * 6., 0.0, d) * 0.12;
+
+                // Colour: sample the lightspeed palette so stars/streaks share DNA.
+                // hue(x) returns vibrant cosine-wheel colors; we desaturate by mixing with white.
+                vec3 tint = hue(r * 2.1 + L * 0.13 + T * 0.02);
+                tint = mix(tint, vec3(1.0), warmMix);   // pull toward white for calm phases
+                col += (s + halo) * tint * brightness * (0.5 + 0.5 / (L + 1.));
+              }
+              return col;
+            }
+
+            void main(void){
+              vec2 uv = (FC - .5*R) / min(R.x, R.y);
+              float b = length(uv);
+
+              // Phase mixing weights (smooth).
+              // 0 → star, 1 → light, 2 → ember (= dimmer, more vignetted star)
+              float wStar  = 1.0 - smoothstep(0.0, 1.0, phase);
+              float wLight = 1.0 - abs(phase - 1.0);
+                    wLight = clamp(wLight, 0.0, 1.0);
+              float wEmber = smoothstep(1.0, 2.0, phase);
+
+              vec3 col = vec3(0);
+
+              // Idle starfield — calm, mostly white
+              if (wStar > 0.001) col += starfield(uv, 0.95, 0.55) * wStar;
+
+              // Lightspeed — full palette
+              if (wLight > 0.001) col += lightspeed(uv, speed) * wLight;
+
+              // Ember — same starfield, dimmer, pulls the palette FORWARD (less white mix),
+              // so the post-test sky feels like cooled-down streaks of the same colour.
+              if (wEmber > 0.001){
+                vec3 emb = starfield(uv, 0.6, 0.15);
+                float glow = exp(-b * 3.5) * 0.12;
+                emb += vec3(1.0, 0.7, 0.5) * glow;
+                col += emb * wEmber;
+              }
+
+              // --- Shockwave ring + white flash (burst) ---
+              if (burst > 0.001){
+                // Flash (screen-wide white, attenuated by distance)
+                float flash = burst * 0.20 * (1.0 - smoothstep(0.0, 1.4, b));
+                col += vec3(flash);
+
+                // Expanding ring — radius grows from 0 to ~1.2 as burst fades 1→0
+                float life = 1.0 - burst;          // 0 fresh → 1 done
+                float rRing = life * 1.35;
+                float ringW = 0.025 + life * 0.18;
+                float ring = smoothstep(ringW, 0.0, abs(b - rRing));
+                ring *= (1.0 - life);              // fade with life
+                col += ring * vec3(1.0, 0.98, 0.92) * 1.2;
+
+                // Inner core pulse
+                float core = exp(-b * 10.0) * burst * 0.8;
+                col += vec3(1.0, 0.96, 0.88) * core;
+              }
+
+              // Global vignette (stronger in ember phase, softer in lightspeed)
+              float vig = smoothstep(1.35, 0.25, length((FC - .5*R) / R.y));
+              float vigMul = mix(0.55, 0.35, wEmber);
+              col *= (1.0 - vigMul) + vigMul * vig;
+
+              O = vec4(col, 1);
+            }
+        </script>
+    </head>
+    <body data-phase="idle" data-density="dashboard">
+        <!-- WebGL stars/lightspeed -->
+        <canvas id="bg"></canvas>
+        <!-- 3D medal — visible in all three v3 phases -->
+        <canvas id="medal-canvas"></canvas>
+
+        <!-- v3 App Chrome — top-left brand -->
+        <div class="v3-chrome tl">
+            <img
+                src="icon-192.png"
+                alt=""
+                class="v3-brand-glyph"
+                aria-hidden="true"
+            />
+            <span class="brand-name">ULTIMATE / SPEED TEST</span>
+        </div>
+
+        <!-- v3 App Chrome — top-right nav -->
+        <div class="v3-chrome tr">
+            <button class="v3-icon-btn" id="nav-history" aria-label="History">
+                <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="10" cy="10" r="7" />
+                    <polyline points="10,5.5 10,10 13,12.5" />
+                </svg>
+            </button>
+            <button class="v3-icon-btn" id="nav-about" aria-label="About">
+                <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                >
+                    <circle cx="10" cy="10" r="7" />
+                    <line x1="10" y1="9" x2="10" y2="14" />
+                    <circle
+                        cx="10"
+                        cy="6.5"
+                        r="0.8"
+                        fill="currentColor"
+                        stroke="none"
+                    />
+                </svg>
+            </button>
+        </div>
+
+        <!-- v3 Status bar — bottom-left, hidden on mobile -->
+        <footer class="v3-status-bar" aria-hidden="true">
+            <span class="v3-live-dot"></span>
+            <span>CLOUDFLARE · ANYCAST</span>
+            <!-- Preserved for app-v2.js compat -->
+            <span
+                id="foot-clock"
+                style="position: absolute; opacity: 0; pointer-events: none"
+            ></span>
+            <span
+                id="foot-proto"
+                style="position: absolute; opacity: 0; pointer-events: none"
+            ></span>
+            <div id="foot-right" style="display: none"></div>
+        </footer>
+
+        <!-- UI layer -->
+        <div id="ui">
+            <!-- ========== IDLE (v3) ========== -->
+            <section id="screen-idle" class="screen active">
+                <!-- Inline medal slot — only used on mobile (260×260).
+                     On desktop/tablet the medal stays fullscreen-overlay. -->
+                <div class="v3-medal-slot"></div>
+
+                <!-- Serif italic copy — sits below the medal (~64% from top) -->
+                <div class="v3-idle-copy">
+                    <h1 class="v3-idle-serif">
+                        How fast does <em>your signal</em> travel.
+                    </h1>
+                    <p class="v3-idle-sub">Press to begin · Takes ~25s</p>
+                </div>
+
+                <!-- START capsule — anchored to bottom -->
+                <div class="v3-idle-actions">
+                    <button
+                        id="btn-start"
+                        class="v3-capsule-primary"
+                        aria-label="Start speed test"
+                    >
+                        <span>START</span>
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <polyline points="7,4 13,10 7,16" />
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ========== TESTING (v3) ========== -->
+            <section id="screen-testing" class="screen">
+                <!-- Phase pill — top centre -->
+                <!-- .step class is kept alongside .v3-phase-seg so the existing
+                     setStep()/markDone() JS targets these elements immediately. -->
+                <div class="v3-testing-pill-row">
+                    <div class="v3-phase-pill">
+                        <span class="v3-phase-seg step" data-step="ping"
+                            ><span class="ind"></span>Ping</span
+                        >
+                        <span class="v3-phase-seg step" data-step="download"
+                            ><span class="ind"></span>Download</span
+                        >
+                        <span class="v3-phase-seg step" data-step="upload"
+                            ><span class="ind"></span>Upload</span
+                        >
+                    </div>
+                </div>
+
+                <!-- Inline medal slot — only used on mobile (220×220). -->
+                <div class="v3-medal-slot"></div>
+
+                <!-- Center live readout (IDs preserved for app-v2.js) -->
+                <div class="v3-testing-center">
+                    <div class="v3-testing-caption" id="live-caption">
+                        MEASURING LATENCY
+                    </div>
+                    <div class="v3-testing-value-row">
+                        <span id="live-value" class="v3-testing-number"
+                            >0.00</span
+                        >
+                        <span id="live-unit" class="v3-testing-unit">ms</span>
+                    </div>
+                </div>
+
+                <!-- Bottom: metric chips + cancel -->
+                <div class="v3-testing-bottom">
+                    <div class="v3-testing-chips">
+                        <div class="v3-metric-chip">
+                            <div class="label">PEAK</div>
+                            <div class="value-row">
+                                <span id="hud-peak" class="value">0.00</span>
+                                <span class="unit">Mbps</span>
+                            </div>
+                        </div>
+                        <div class="v3-metric-chip">
+                            <div class="label">AVG</div>
+                            <div class="value-row">
+                                <span id="hud-avg" class="value">0.00</span>
+                                <span class="unit">Mbps</span>
+                            </div>
+                        </div>
+                        <div class="v3-metric-chip">
+                            <div class="label">ELAPSED</div>
+                            <div class="value-row">
+                                <span id="hud-elapsed" class="value">0.0s</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-cancel" class="v3-capsule-secondary">
+                        Cancel
+                    </button>
+                </div>
+
+                <!-- Preserved for app-v2.js — not visible -->
+                <span
+                    id="hud-samples"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <span
+                    id="hud-bytes"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <span
+                    id="hud-shader"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <span
+                    id="hud-ptr"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <span
+                    id="hud-phase"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <span
+                    id="hud-sid"
+                    aria-hidden="true"
+                    style="display: none"
+                ></span>
+                <div
+                    id="progress-fill"
+                    aria-hidden="true"
+                    style="display: none"
+                ></div>
+                <svg id="spark" aria-hidden="true" style="display: none">
+                    <path id="spark-fill"></path>
+                    <path id="spark-line"></path>
+                </svg>
+            </section>
+
+            <!-- ========== RESULT (v3) ========== -->
+            <section id="screen-result" class="screen">
+                <!-- Grade pill — top centre 16% -->
+                <div class="v3-result-grade-row">
+                    <div class="v3-grade-pill" id="grade-pill" data-grade="—">
+                        <div class="badge" id="grade-letter">—</div>
+                        <div class="v3-grade-pill-text">
+                            <div class="caption" id="grade-title">PENDING</div>
+                            <div class="v3-grade-sub" id="grade-desc"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inline medal slot — only used on mobile (200×200). -->
+                <div class="v3-medal-slot"></div>
+
+                <!-- Top-left title — desktop/tablet only -->
+                <div class="v3-result-title">
+                    <div class="v3-result-eyebrow" id="result-date">
+                        BENCHMARK COMPLETE
+                    </div>
+                    <h2 class="v3-result-headline">
+                        Your connection,<br /><em>forged.</em>
+                    </h2>
+                </div>
+
+                <!-- 4 metric chips orbiting the medal -->
+                <!-- position set via CSS data-chip selectors -->
+                <div class="v3-chip-orbit">
+                    <div class="v3-metric-chip v3-orbit-chip" data-chip="down">
+                        <div class="label">DOWNLOAD</div>
+                        <div class="value-row">
+                            <span id="r-down" class="value">—</span>
+                            <span class="unit">Mbps</span>
+                        </div>
+                    </div>
+                    <div class="v3-metric-chip v3-orbit-chip" data-chip="up">
+                        <div class="label">UPLOAD</div>
+                        <div class="value-row">
+                            <span id="r-up" class="value">—</span>
+                            <span class="unit">Mbps</span>
+                        </div>
+                    </div>
+                    <div class="v3-metric-chip v3-orbit-chip" data-chip="ping">
+                        <div class="label">PING</div>
+                        <div class="value-row">
+                            <span id="r-ping" class="value">—</span>
+                            <span class="unit">ms</span>
+                        </div>
+                    </div>
+                    <div
+                        class="v3-metric-chip v3-orbit-chip"
+                        data-chip="jitter"
+                    >
+                        <div class="label">JITTER</div>
+                        <div class="value-row">
+                            <span id="r-jitter" class="value">—</span>
+                            <span class="unit">ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drag hint — bottom-right of medal area -->
+                <div class="v3-medal-hint" aria-hidden="true">
+                    DRAG · SCROLL
+                </div>
+
+                <!-- Bottom bar: cap strip + disclaimer + Run Again + Share -->
+                <div class="v3-result-bottom">
+                    <div class="v3-result-info">
+                        <div class="v3-cap-strip">
+                            <span class="head">// CAPABILITY</span>
+                            <span class="v3-cap-pill bench-row" data-min="3"
+                                ><span class="bench-check" hidden></span>HD
+                                Call</span
+                            >
+                            <span class="v3-cap-pill bench-row" data-min="5"
+                                ><span class="bench-check" hidden></span
+                                >1080p</span
+                            >
+                            <span class="v3-cap-pill bench-row" data-min="25"
+                                ><span class="bench-check" hidden></span>4K
+                                HDR</span
+                            >
+                            <span class="v3-cap-pill bench-row" data-min="50"
+                                ><span class="bench-check" hidden></span>Cloud
+                                Gaming</span
+                            >
+                            <span class="v3-cap-pill bench-row" data-min="100"
+                                ><span class="bench-check" hidden></span>8K
+                                Multi</span
+                            >
+                            <span class="v3-cap-pill bench-row" data-min="300"
+                                ><span class="bench-check" hidden></span>Pro ·
+                                VR</span
+                            >
+                        </div>
+                        <p class="v3-disclaimer">
+                            <span class="tag">// NOTE</span>Measured to
+                            Cloudflare global edge. Corporate firewalls may
+                            throttle upload to non-whitelisted endpoints.
+                        </p>
+                    </div>
+
+                    <div class="v3-result-btn-row">
+                        <button id="btn-restart" class="v3-capsule-primary">
+                            <svg
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M3.5 10a6.5 6.5 0 1 1 1.2 3.8" />
+                                <polyline points="3.5,14.5 3.5,10 7.5,10" />
+                            </svg>
+                            <span>Run Again</span>
+                        </button>
+                        <button
+                            id="btn-share"
+                            class="v3-icon-btn lg"
+                            aria-label="Share"
+                        >
+                            <svg
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="15" cy="4" r="1.8" />
+                                <circle cx="15" cy="16" r="1.8" />
+                                <circle cx="5" cy="10" r="1.8" />
+                                <line x1="6.7" y1="9.1" x2="13.3" y2="4.9" />
+                                <line x1="6.7" y1="10.9" x2="13.3" y2="15.1" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- btn-history: app-v2.js wires a click handler; hidden from view -->
+                <button id="btn-history" hidden aria-hidden="true"></button>
+            </section>
+        </div>
+
+        <!-- History drawer (v3) -->
+        <aside class="v3-drawer" id="history-drawer" aria-hidden="true">
+            <div class="v3-drawer-head">
+                <div>
+                    <div class="v3-drawer-eyebrow">// HISTORY</div>
+                    <h3 class="v3-drawer-title">Test Runs</h3>
+                </div>
+                <button
+                    class="v3-icon-btn"
+                    id="drawer-close"
+                    aria-label="Close history"
+                >
+                    <svg
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                    >
+                        <line x1="4" y1="4" x2="16" y2="16" />
+                        <line x1="16" y1="4" x2="4" y2="16" />
+                    </svg>
+                </button>
+            </div>
+            <div class="v3-history-list" id="history-list"></div>
+        </aside>
+
+        <!-- About drawer (v3) -->
+        <aside class="v3-drawer" id="about-drawer" aria-hidden="true">
+            <div class="v3-drawer-head">
+                <div>
+                    <div class="v3-drawer-eyebrow">// ABOUT</div>
+                    <h3 class="v3-drawer-title">Ultimate Speed Test</h3>
+                </div>
+                <button
+                    class="v3-icon-btn"
+                    id="about-close"
+                    aria-label="Close about"
+                >
+                    <svg
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                    >
+                        <line x1="4" y1="4" x2="16" y2="16" />
+                        <line x1="16" y1="4" x2="4" y2="16" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="v3-about-content">
+                <div class="v3-about-section">
+                    <div class="v3-about-section-head">WHAT IT MEASURES</div>
+                    <div class="v3-about-row">
+                        <span class="key">Download</span
+                        ><span class="val"
+                            >Bandwidth to nearest Cloudflare edge node</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Upload</span
+                        ><span class="val"
+                            >Upstream via Cloudflare Workers proxy</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Ping</span
+                        ><span class="val"
+                            >Round-trip latency — median of 20 samples</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Jitter</span
+                        ><span class="val"
+                            >Latency std-dev — indicates stability</span
+                        >
+                    </div>
+                </div>
+
+                <div class="v3-about-section">
+                    <div class="v3-about-section-head">GRADING SCALE</div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade s">S</span
+                        ><span class="title">LIGHTSPEED</span
+                        ><span class="thresh">≥ 500 Mbps</span
+                        ><span class="desc">Fibre class</span>
+                    </div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade a">A</span
+                        ><span class="title">EXCELLENT</span
+                        ><span class="thresh">≥ 200 Mbps</span
+                        ><span class="desc">Gigabit territory</span>
+                    </div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade b">B</span
+                        ><span class="title">STRONG</span
+                        ><span class="thresh">≥ 80 Mbps</span
+                        ><span class="desc">Premium broadband</span>
+                    </div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade c">C</span
+                        ><span class="title">STEADY</span
+                        ><span class="thresh">≥ 25 Mbps</span
+                        ><span class="desc">Solid everyday link</span>
+                    </div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade d">D</span
+                        ><span class="title">LIMITED</span
+                        ><span class="thresh">≥ 5 Mbps</span
+                        ><span class="desc">Basic connectivity</span>
+                    </div>
+                    <div class="v3-about-grade-row">
+                        <span class="grade f">F</span
+                        ><span class="title">CRITICAL</span
+                        ><span class="thresh">&lt; 5 Mbps</span
+                        ><span class="desc">Below threshold</span>
+                    </div>
+                </div>
+
+                <div class="v3-about-section">
+                    <div class="v3-about-section-head">PRIVACY</div>
+                    <div class="v3-about-row">
+                        <span class="key">Tracking</span
+                        ><span class="val"
+                            >None — runs entirely in your browser</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Data</span
+                        ><span class="val"
+                            >No results leave your device; history is
+                            local-only</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Network</span
+                        ><span class="val"
+                            >Only test traffic goes to Cloudflare anycast</span
+                        >
+                    </div>
+                </div>
+
+                <div class="v3-about-section">
+                    <div class="v3-about-section-head">NOTES</div>
+                    <div class="v3-about-row">
+                        <span class="key">Corporate</span
+                        ><span class="val"
+                            >Firewalls may throttle upload to non-whitelisted
+                            endpoints — results may be lower than local ISP
+                            tests</span
+                        >
+                    </div>
+                    <div class="v3-about-row">
+                        <span class="key">Version</span
+                        ><span class="val"
+                            >v2.0 — built on Three.js, Cloudflare Speed
+                            API</span
+                        >
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Tweaks panel -->
+        <div id="tweaks-panel">
+            <h4>// TWEAKS</h4>
+            <label>
+                <span
+                    >SHADER INTENSITY ·
+                    <span class="val" id="tw-i-val">1.0×</span></span
+                >
+                <input
+                    type="range"
+                    id="tw-intensity"
+                    min="0.5"
+                    max="3"
+                    step="0.1"
+                    value="1.0"
+                />
+            </label>
+            <label>
+                <span>UI DENSITY</span>
+                <div class="seg">
+                    <button data-density="minimal">MINIMAL</button>
+                    <button data-density="dashboard" class="on">
+                        DASHBOARD
+                    </button>
+                </div>
+            </label>
+        </div>
+
+        <!-- Share preview modal -->
+        <div
+            class="share-modal"
+            id="share-modal"
+            aria-hidden="true"
+            role="dialog"
+            aria-label="Share your result"
+        >
+            <div class="share-modal-backdrop" id="share-modal-backdrop"></div>
+            <div class="share-modal-card" role="document">
+                <div class="share-modal-head">
+                    <div>
+                        <div class="share-modal-eyebrow">// SHARE</div>
+                        <h3 class="share-modal-title">Result snapshot</h3>
+                    </div>
+                    <button
+                        class="v3-icon-btn"
+                        id="share-modal-close"
+                        aria-label="Close share dialog"
+                    >
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                        >
+                            <line x1="4" y1="4" x2="16" y2="16" />
+                            <line x1="16" y1="4" x2="4" y2="16" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div
+                    class="share-modal-preview"
+                    id="share-modal-preview"
+                    aria-label="Generated share image preview"
+                ></div>
+
+                <div class="share-modal-actions">
+                    <button
+                        class="share-action"
+                        id="share-action-download"
+                        type="button"
+                    >
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M10 3 v10" />
+                            <polyline points="6,10 10,14 14,10" />
+                            <line x1="4" y1="17" x2="16" y2="17" />
+                        </svg>
+                        <span>DOWNLOAD</span>
+                    </button>
+                    <button
+                        class="share-action"
+                        id="share-action-copy"
+                        type="button"
+                    >
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <rect x="6" y="6" width="10" height="10" rx="1.6" />
+                            <path d="M4 13V5a1 1 0 0 1 1-1h8" />
+                        </svg>
+                        <span>COPY</span>
+                    </button>
+                    <button
+                        class="share-action"
+                        id="share-action-native"
+                        type="button"
+                    >
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M14 7 V4 L18 8 L14 12 V9" />
+                            <path d="M14 8 H9 a4 4 0 0 0 -4 4 v4" />
+                        </svg>
+                        <span>SHARE…</span>
+                    </button>
+                </div>
+
+                <div class="share-modal-hint" id="share-modal-hint">
+                    1080×1350 PNG · Renders locally, never uploaded
+                </div>
+            </div>
+        </div>
+
+        <!-- Share toast -->
+        <div class="toast" id="toast">LINK COPIED</div>
+
+        <script>
+            const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
+                intensity: 0.5,
+                density: "minimal",
+            }; /*EDITMODE-END*/
+
+            // Upload proxy — Cloudflare Worker running on CF's own network.
+            // Gives accurate results from any environment (Netlify, Viverse, local).
+            // speedtest.js probes this first; falls back to /api/upload (Netlify
+            // edge function), then to Cloudflare __up as last resort.
+            window.UPLOAD_PROXY_URL =
+                "https://ust-upload-proxy.liamz-dev.workers.dev";
+        </script>
+
+        <!-- importmap: lets the GLTFLoader/DRACOLoader ES-module resolve "three" from CDN -->
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+                }
+            }
+        </script>
+
+        <!-- Three.js global (used by shader-renderer, medal, app-v2 as window.THREE) -->
+        <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+        <!-- Attach GLTFLoader + DRACOLoader to window.THREE so medal.js can use them.
+       This module script is deferred by the browser and will finish well before
+       setGrade() is ever called (after a ~30 s speed test). -->
+        <script type="module">
+            import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+            import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+            import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+            import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+            // Draco decoder (for Draco-compressed meshes)
+            const draco = new DRACOLoader();
+            draco.setDecoderPath(
+                "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/",
+            );
+            draco.preload();
+
+            // KTX2 decoder (for BasisU-compressed textures from gltfpack -tc)
+            const ktx2 = new KTX2Loader();
+            ktx2.setTranscoderPath(
+                "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/basis/",
+            );
+
+            // Expose everything so medal.js can wire them into its loader
+            window.THREE.GLTFLoader = GLTFLoader;
+            window.THREE.DRACOLoader = DRACOLoader;
+            window.THREE.KTX2Loader = KTX2Loader;
+            window.__draco = draco;
+            window.__ktx2 = ktx2;
+            window.__meshoptDecoder = MeshoptDecoder;
+
+            console.log(
+                "[loaders] GLTFLoader + DRACOLoader + KTX2Loader + MeshoptDecoder ready",
+            );
+        </script>
+        <script src="speedtest.js"></script>
+        <script src="shader-renderer.js"></script>
+        <script src="medal.js"></script>
+        <script src="share-card.js"></script>
+        <script src="app-v2.js"></script>
+        <script>
+            // Register the PWA service worker. file:// won't work — needs http(s).
+            if ("serviceWorker" in navigator && location.protocol !== "file:") {
+                window.addEventListener("load", () => {
+                    navigator.serviceWorker.register("sw.js").catch((err) => {
+                        console.warn("[pwa] SW registration failed:", err);
+                    });
+                });
+            }
+        </script>
+    </body>
+</html>

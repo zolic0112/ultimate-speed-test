@@ -1,0 +1,2879 @@
+/* ============================================================
+   Ultimate Speed Test — UI
+   Tone: Apple/Linear 極簡精品 × HUD 航太儀表
+   Palette: 純黑底 + 白階 (no hue, color lives in the shader)
+   ============================================================ */
+
+:root {
+    --bg: #000;
+    --fg: #fff;
+    --w-04: rgba(255, 255, 255, 0.04);
+    --w-08: rgba(255, 255, 255, 0.08);
+    --w-12: rgba(255, 255, 255, 0.12);
+    --w-20: rgba(255, 255, 255, 0.2);
+    --w-40: rgba(255, 255, 255, 0.4);
+    --w-60: rgba(255, 255, 255, 0.6);
+    --w-80: rgba(255, 255, 255, 0.8);
+    --hud-line: rgba(255, 255, 255, 0.14);
+    --hud-line-strong: rgba(255, 255, 255, 0.28);
+    --font-display: "Space Grotesk", "Noto Sans TC", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-display);
+    font-feature-settings: "ss01", "ss02", "tnum";
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    touch-action: none;
+}
+
+button {
+    font-family: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+/* Canvases stacked full-bleed */
+#bg,
+#medal-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+#bg {
+    z-index: 0;
+}
+#medal-canvas {
+    z-index: 1;
+    pointer-events: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 0.9s var(--ease-out),
+        visibility 0.9s var(--ease-out);
+}
+body[data-phase="result"] #medal-canvas {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* UI layer */
+#ui {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* ============================================================
+   Global chrome (topbar / footer / corner markers)
+   ============================================================ */
+.chrome {
+    position: fixed;
+    z-index: 3;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--w-60);
+}
+.chrome > * {
+    pointer-events: auto;
+}
+
+.topbar {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: calc(20px + env(safe-area-inset-top))
+        calc(28px + env(safe-area-inset-right)) 20px
+        calc(28px + env(safe-area-inset-left));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.bottombar {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 18px calc(28px + env(safe-area-inset-right))
+        calc(18px + env(safe-area-inset-bottom))
+        calc(28px + env(safe-area-inset-left));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--fg);
+    font-weight: 500;
+}
+.brand-mark {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--fg);
+    position: relative;
+}
+.brand-mark::before,
+.brand-mark::after {
+    content: "";
+    position: absolute;
+    background: var(--fg);
+}
+.brand-mark::before {
+    top: 50%;
+    left: -3px;
+    right: -3px;
+    height: 1px;
+    transform: translateY(-50%);
+}
+.brand-mark::after {
+    left: 50%;
+    top: -3px;
+    bottom: -3px;
+    width: 1px;
+    transform: translateX(-50%);
+}
+
+.brand-name {
+    letter-spacing: 0.32em;
+}
+.brand-slash {
+    opacity: 0.3;
+    margin: 0 2px;
+}
+.brand-version {
+    opacity: 0.5;
+    font-size: 10px;
+}
+
+.top-nav {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+}
+.top-nav button {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    color: var(--w-60);
+    text-transform: uppercase;
+    transition: color 0.2s;
+}
+.top-nav button:hover {
+    color: var(--fg);
+}
+
+.bottom-meta {
+    display: flex;
+    gap: 20px;
+    color: var(--w-40);
+}
+.bottom-meta .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--w-80);
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Corner frame markers — subtle targeting cross */
+.corner {
+    position: fixed;
+    width: 24px;
+    height: 24px;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0.5;
+}
+.corner::before,
+.corner::after {
+    content: "";
+    position: absolute;
+    background: var(--w-60);
+}
+.corner.tl {
+    top: 72px;
+    left: 28px;
+}
+.corner.tr {
+    top: 72px;
+    right: 28px;
+}
+.corner.bl {
+    bottom: 60px;
+    left: 28px;
+}
+.corner.br {
+    bottom: 60px;
+    right: 28px;
+}
+.corner::before {
+    width: 10px;
+    height: 1px;
+    top: 0;
+}
+.corner::after {
+    width: 1px;
+    height: 10px;
+    left: 0;
+}
+.corner.tr::before {
+    right: 0;
+    left: auto;
+}
+.corner.tr::after {
+    right: 0;
+    left: auto;
+}
+.corner.bl::before {
+    top: auto;
+    bottom: 0;
+}
+.corner.bl::after {
+    top: auto;
+    bottom: 0;
+}
+.corner.br::before {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: auto;
+}
+.corner.br::after {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: auto;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* ============================================================
+   Screens
+   ============================================================ */
+.screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 0.6s var(--ease-out),
+        visibility 0.6s var(--ease-out);
+    pointer-events: none;
+}
+.screen.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+/* Result screen must let pointer events fall through to #medal-canvas.
+   Only the right-side panel (buttons) opts back in. */
+.screen.result.active {
+    pointer-events: none;
+}
+.screen.result.active .result-panel {
+    pointer-events: auto;
+}
+/* Same passthrough on idle so the desktop fullscreen medal can be dragged.
+   Children that need clicks (START button, mobile medal slot, copy) opt back in
+   individually elsewhere in this stylesheet. */
+#screen-idle.active {
+    pointer-events: none;
+}
+
+/* ============================================================
+   LANDING (idle)
+   ============================================================ */
+.landing {
+    gap: 2.5rem;
+    padding: 4rem 2rem;
+    justify-content: center;
+    overflow: hidden;
+}
+.landing > * {
+    flex-shrink: 0;
+}
+
+.landing-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    padding: 6px 14px;
+    border: 1px solid var(--hud-line);
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.landing-eyebrow .live {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.landing-title {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 10vw, 8rem);
+    font-weight: 200;
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+    text-align: center;
+    max-width: 14ch;
+    text-wrap: balance;
+}
+.landing-title .strong {
+    font-weight: 500;
+}
+.landing-title .italic {
+    font-style: italic;
+    font-weight: 300;
+    opacity: 0.7;
+}
+
+.landing-sub {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    text-align: center;
+    max-width: 42ch;
+    line-height: 1.8;
+}
+
+/* Start button — large glass disc */
+.start-btn {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: var(--w-04);
+    border: 1px solid var(--w-40);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    transition:
+        transform 0.4s var(--ease-out),
+        background 0.3s,
+        border-color 0.3s,
+        box-shadow 0.4s;
+    overflow: hidden;
+}
+.start-btn::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--w-20);
+    transition:
+        inset 0.4s var(--ease-out),
+        border-color 0.3s;
+}
+.start-btn:hover {
+    background: var(--w-08);
+    border-color: var(--fg);
+    box-shadow: 0 0 80px rgba(255, 255, 255, 0.15);
+    transform: scale(1.04);
+}
+.start-btn:hover::before {
+    inset: 14px;
+    border-color: var(--w-60);
+}
+.start-btn:active {
+    transform: scale(0.98);
+}
+.start-btn span {
+    display: block;
+    position: relative;
+    z-index: 1;
+}
+.start-btn .label {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--fg);
+}
+.start-btn .sub {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--w-60);
+    letter-spacing: 0.4em;
+}
+
+.landing-hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--w-40);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.landing-hint .key {
+    border: 1px solid var(--hud-line);
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: var(--w-80);
+}
+
+/* ============================================================
+   TESTING — HUD dashboard
+   ============================================================ */
+.testing {
+    padding: 0;
+}
+
+.testing-wrap {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 96px 28px 80px;
+}
+
+/* Top phase stepper */
+.stepper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    border-top: 1px solid var(--hud-line);
+    border-bottom: 1px solid var(--hud-line);
+}
+.step {
+    padding: 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    transition: opacity 0.4s;
+    opacity: 0.35;
+}
+.step + .step {
+    border-left: 1px solid var(--hud-line);
+}
+.step.done {
+    opacity: 0.65;
+}
+.step.active {
+    opacity: 1;
+}
+.step-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--w-60);
+}
+.step-label {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+}
+.step-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--fg);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s linear;
+}
+.step.active .step-bar {
+    transform: scaleX(var(--p, 0));
+}
+.step.done .step-bar {
+    transform: scaleX(1);
+}
+
+/* Center live readout */
+.live-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    position: relative;
+}
+
+.live-number {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    font-weight: 200;
+    line-height: 1;
+    text-shadow: 0 0 60px rgba(0, 0, 0, 0.85);
+}
+
+#live-value {
+    font-size: clamp(6rem, 20vw, 16rem);
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    font-weight: 200;
+}
+.live-number .unit {
+    font-family: var(--font-mono);
+    font-size: clamp(1rem, 1.8vw, 1.3rem);
+    letter-spacing: 0.2em;
+    color: var(--w-60);
+    text-transform: uppercase;
+    font-weight: 400;
+}
+
+.live-caption {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--w-60);
+}
+
+/* HUD side panels */
+.hud {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    padding: 14px 18px;
+    border: 1px solid var(--hud-line);
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    min-width: 220px;
+}
+.hud-title {
+    color: var(--w-40);
+    font-size: 9px;
+    letter-spacing: 0.36em;
+}
+.hud-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: baseline;
+}
+.hud-row b {
+    font-weight: 500;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+.hud.tl {
+    top: 96px;
+    left: 28px;
+}
+.hud.bl {
+    bottom: 80px;
+    left: 28px;
+}
+.hud.tr {
+    top: 96px;
+    right: 28px;
+}
+.hud.br {
+    bottom: 80px;
+    right: 28px;
+}
+
+/* Live sparkline inside HUD */
+.spark {
+    width: 100%;
+    height: 48px;
+    display: block;
+    stroke: var(--fg);
+    stroke-width: 1;
+    fill: none;
+}
+.spark-fill {
+    fill: rgba(255, 255, 255, 0.06);
+}
+
+/* Bottom progress */
+.test-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.progress-track {
+    width: min(640px, 80vw);
+    height: 1px;
+    background: var(--hud-line);
+    position: relative;
+    overflow: hidden;
+}
+.progress-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0%;
+    background: var(--fg);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+    transition: width 0.15s linear;
+}
+.progress-ticks {
+    width: min(640px, 80vw);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    color: var(--w-40);
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   RESULT — Medal + metrics
+   ============================================================ */
+.result {
+    padding: 0;
+}
+.result-wrap {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    grid-template-rows: 1fr;
+    padding: 96px 28px 80px;
+    gap: 24px;
+    align-items: stretch;
+    /* Let pointer events fall through to #medal-canvas below. Opt-in children
+     (result-panel buttons, medal-stage header/footer) re-enable themselves. */
+    pointer-events: none;
+}
+.result-wrap .result-panel {
+    pointer-events: auto;
+}
+
+.medal-stage {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+}
+.medal-stage > * {
+    pointer-events: auto;
+}
+
+.medal-header {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.medal-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--w-60);
+}
+.medal-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4.5vw, 3.6rem);
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+.medal-title .strong {
+    font-weight: 500;
+}
+
+.medal-footer {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+}
+.grade-block {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+.grade-letter {
+    font-family: var(--font-display);
+    font-size: clamp(6rem, 10vw, 10rem);
+    font-weight: 200;
+    line-height: 0.85;
+    letter-spacing: -0.06em;
+}
+.grade-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--w-60);
+}
+.grade-meta b {
+    color: var(--fg);
+    font-weight: 500;
+    letter-spacing: 0.2em;
+}
+
+.medal-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--w-40);
+    text-align: right;
+    max-width: 20ch;
+    line-height: 1.6;
+}
+
+/* Right panel */
+.result-panel {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.result-panel::-webkit-scrollbar {
+    width: 4px;
+}
+.result-panel::-webkit-scrollbar-thumb {
+    background: var(--w-20);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--hud-line);
+    border: 1px solid var(--hud-line);
+}
+.metric {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 100px;
+}
+.metric-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    display: flex;
+    justify-content: space-between;
+}
+.metric-label .idx {
+    color: var(--w-40);
+}
+.metric-value {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.metric-value .unit {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    color: var(--w-60);
+    text-transform: uppercase;
+    font-weight: 400;
+}
+
+/* Benchmark list */
+.result-disclaimer {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.7;
+    letter-spacing: 0.08em;
+    color: var(--w-40);
+    border-left: 1px solid var(--hud-line);
+    padding: 4px 0 4px 12px;
+    margin: 4px 0;
+    text-transform: none;
+}
+.result-disclaimer .disclaimer-tag {
+    font-size: 9px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    margin-right: 6px;
+    font-weight: 500;
+}
+
+.bench {
+    border: 1px solid var(--hud-line);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+.bench-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: var(--w-60);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.bench-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--w-80);
+    padding: 4px 0;
+}
+.bench-check {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--w-40);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+.bench-check.on {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: #000;
+}
+.bench-check.on::after {
+    content: "✓";
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+.bench-row.on {
+    color: var(--fg);
+}
+.bench-row.off {
+    color: var(--w-40);
+    text-decoration: line-through;
+    text-decoration-color: var(--w-20);
+}
+
+/* Action row */
+.actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    padding: 14px 18px;
+    border: 1px solid var(--w-40);
+    color: var(--fg);
+    background: var(--w-04);
+    backdrop-filter: blur(10px);
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        transform 0.2s;
+    text-align: center;
+}
+.btn:hover {
+    background: var(--w-12);
+    border-color: var(--fg);
+}
+.btn:active {
+    transform: scale(0.98);
+}
+.btn.primary {
+    background: var(--fg);
+    color: #000;
+    border-color: var(--fg);
+}
+.btn.primary:hover {
+    background: var(--w-80);
+}
+.btn.full {
+    grid-column: 1 / -1;
+}
+
+/* ============================================================
+   History drawer
+   ============================================================ */
+.drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(440px, 92vw);
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-left: 1px solid var(--hud-line);
+    transform: translateX(100%);
+    transition: transform 0.5s var(--ease-out);
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    gap: 20px;
+}
+.drawer.open {
+    transform: translateX(0);
+}
+.drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.drawer-head h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+}
+.drawer-close {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--w-60);
+    text-transform: uppercase;
+}
+.drawer-close:hover {
+    color: var(--fg);
+}
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.history-list::-webkit-scrollbar {
+    width: 4px;
+}
+.history-list::-webkit-scrollbar-thumb {
+    background: var(--w-20);
+}
+.history-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 14px;
+    padding: 14px;
+    border: 1px solid var(--hud-line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--w-80);
+}
+.history-item .t {
+    color: var(--w-60);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    grid-column: 1 / -1;
+}
+.history-item .pair {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+.history-item .pair b {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+}
+.history-item .pair span {
+    color: var(--w-40);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+.history-empty {
+    color: var(--w-40);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-align: center;
+    padding: 40px 0;
+}
+
+/* ============================================================
+   Tweaks panel (lives in top-right when host activates)
+   ============================================================ */
+#tweaks-panel {
+    position: fixed;
+    bottom: 60px;
+    right: 28px;
+    z-index: 20;
+    width: 280px;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--hud-line-strong);
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--w-80);
+}
+#tweaks-panel.on {
+    display: flex;
+}
+#tweaks-panel h4 {
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--w-60);
+    text-transform: uppercase;
+    font-weight: 500;
+}
+#tweaks-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: var(--w-60);
+    text-transform: uppercase;
+}
+#tweaks-panel .val {
+    color: var(--fg);
+    font-weight: 500;
+}
+#tweaks-panel input[type="range"] {
+    accent-color: #fff;
+}
+#tweaks-panel .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+}
+#tweaks-panel .seg button {
+    padding: 8px;
+    border: 1px solid var(--hud-line);
+    color: var(--w-60);
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+#tweaks-panel .seg button.on {
+    background: var(--fg);
+    color: #000;
+    border-color: var(--fg);
+}
+
+/* ============================================================
+   Share preview modal
+   Centered overlay shown when the user taps the share button on
+   the result screen. Hosts a live preview of the generated PNG
+   plus three actions (download / copy to clipboard / native share).
+   Designed to feel native to the app (matches drawer styling)
+   instead of falling back to the OS share sheet.
+   ============================================================ */
+.share-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.28s var(--v3-ease-out);
+}
+.share-modal.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+.share-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.share-modal-card {
+    position: relative;
+    width: min(560px, 100%);
+    max-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 26px 26px 22px;
+    background: rgba(8, 8, 12, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.34s var(--v3-ease-out);
+    overflow: hidden;
+}
+.share-modal.open .share-modal-card {
+    transform: scale(1) translateY(0);
+}
+
+.share-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.share-modal-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 6px;
+}
+.share-modal-title {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* Preview hosts the canvas/img — fits height on small screens via max-height */
+.share-modal-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.share-modal-preview canvas,
+.share-modal-preview img {
+    display: block;
+    max-width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+}
+
+/* Action row */
+.share-modal-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.share-action {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 14px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    transition:
+        background 0.18s,
+        border-color 0.18s,
+        transform 0.12s;
+}
+.share-action svg {
+    width: 18px;
+    height: 18px;
+}
+.share-action:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+.share-action:active {
+    transform: scale(0.97);
+}
+.share-action[hidden] {
+    display: none;
+}
+
+.share-modal-hint {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* Mobile tightening */
+@media (max-width: 540px) {
+    .share-modal {
+        padding: 16px;
+    }
+    .share-modal-card {
+        padding: 18px 16px 16px;
+        gap: 14px;
+        border-radius: 14px;
+    }
+    .share-modal-preview canvas,
+    .share-modal-preview img {
+        max-height: 52vh;
+    }
+    .share-action {
+        padding: 12px 6px;
+        font-size: 9px;
+        letter-spacing: 0.22em;
+    }
+}
+
+/* ============================================================
+   Share toast
+   ============================================================ */
+.toast {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translate(-50%, -16px);
+    z-index: 30;
+    padding: 10px 18px;
+    background: var(--fg);
+    color: #000;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition:
+        opacity 0.3s,
+        transform 0.3s;
+    pointer-events: none;
+}
+.toast.on {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 960px) {
+    .hud.tl,
+    .hud.bl,
+    .hud.tr,
+    .hud.br {
+        display: none;
+    }
+    .result-wrap {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        padding: 80px 20px 70px;
+    }
+    .medal-stage {
+        height: 50vh;
+    }
+}
+
+/* Minimal mode — hide HUD corner bits */
+body[data-density="minimal"] .hud,
+body[data-density="minimal"] .corner {
+    display: none;
+}
+
+/* Dashboard mode default keeps everything */
+
+/* v3 — medal visible in idle + testing too (not just result) */
+body[data-phase="idle"] #medal-canvas {
+    opacity: 1;
+    visibility: visible;
+}
+body[data-phase="testing"] #medal-canvas {
+    opacity: 0.82;
+    visibility: visible;
+    filter: brightness(0.88) saturate(0.65);
+}
+
+/* v3 mobile result — medal becomes a 200×200 inline element in the stack.
+   JS (placeMedalCanvas) re-parents #medal-canvas into #medal-inline-slot
+   and adds .inline. We override fixed/inset to make it flow with the column. */
+/* When inline, the canvas inherits its size from the slot (100% width/height
+   of whichever .v3-medal-slot it sits in). Per-screen sizes are set on the slot. */
+#medal-canvas.inline {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    flex: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    filter: none !important;
+    z-index: auto !important;
+    display: block;
+    /* Inline medal must always receive pointer/touch events for drag+pinch.
+       (The fullscreen overlay variant relies on its own #medal-canvas rule.) */
+    pointer-events: auto !important;
+}
+/* Slot is hidden by default and only shows on mobile in the active screen. */
+.v3-medal-slot {
+    display: none;
+    pointer-events: auto;
+}
+body[data-bp="mobile"] #screen-idle.active .v3-medal-slot,
+body[data-bp="mobile"] #screen-testing.active .v3-medal-slot,
+body[data-bp="mobile"] #screen-result.active .v3-medal-slot {
+    display: block;
+    flex: none;
+}
+/* Per-screen mobile sizes.
+   Testing screen does NOT use inline; medal stays fullscreen so the
+   shader streaks centre on it. */
+body[data-bp="mobile"] #screen-idle .v3-medal-slot {
+    width: min(460px, 82vw);
+    height: min(460px, 82vw);
+}
+/* Mobile result medal: large (380px) so it has real visual weight and is
+   easy to drag/zoom on touch. margin pushes it down a touch so it sits
+   slightly below the grade pill and partially overlaps the chip area below
+   — letting the cosmic background flow through the empty corners of the
+   square slot instead of cleanly stacking. */
+body[data-bp="mobile"] #screen-result .v3-medal-slot {
+    width: 380px;
+    height: 380px;
+    margin-top: 8px;
+    margin-bottom: -32px;
+}
+
+/* ============================================================
+   v3 design system — native-app feel (idle / testing / result)
+   Additive only — lives below the legacy styles so screens
+   that already use v3 markup pick these up automatically and
+   nothing above is broken. Toggle in screen markup, not here.
+   ============================================================ */
+:root {
+    --v3-font-serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+    --v3-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --v3-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --v3-glass-bg: rgba(20, 20, 26, 0.55);
+    --v3-glass-bg-strong: rgba(28, 28, 36, 0.75);
+    --v3-glass-border: rgba(255, 255, 255, 0.1);
+    --v3-glass-border-strong: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Glass surface ('the workhorse for capsules / chips / cards') ───── */
+.v3-glass {
+    background: var(--v3-glass-bg);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid var(--v3-glass-border);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 18px 50px rgba(0, 0, 0, 0.45),
+        0 0 0 0.5px rgba(255, 255, 255, 0.02);
+}
+.v3-glass-strong {
+    background: var(--v3-glass-bg-strong);
+    backdrop-filter: blur(36px) saturate(160%);
+    -webkit-backdrop-filter: blur(36px) saturate(160%);
+    border: 1px solid var(--v3-glass-border-strong);
+}
+
+/* ── Brand glyph (top-left corner, 36×36 rounded square w/ crosshair) ──── */
+.v3-brand-glyph {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+    flex: none;
+}
+
+/* ── Icon button (rounded square, 36×36 small / 68×68 large) ────────── */
+.v3-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background 0.2s,
+        transform 0.2s var(--v3-ease-spring);
+    flex: none;
+    padding: 0;
+}
+.v3-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.v3-icon-btn:active {
+    transform: scale(0.94);
+}
+.v3-icon-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+.v3-icon-btn.lg {
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
+}
+.v3-icon-btn.lg svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* ── Capsule (pill) buttons ─ the primary action language ───────────── */
+.v3-capsule-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px 36px;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.96),
+        rgba(235, 235, 238, 0.92)
+    );
+    color: #000;
+    border: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.6) inset,
+        0 -8px 20px rgba(0, 0, 0, 0.05) inset,
+        0 18px 40px rgba(255, 255, 255, 0.18),
+        0 0 0 1px rgba(255, 255, 255, 0.4);
+    transition: transform 0.25s var(--v3-ease-spring);
+}
+.v3-capsule-primary:hover {
+    transform: translateY(-1px) scale(1.02);
+}
+.v3-capsule-primary:active {
+    transform: scale(0.97);
+}
+.v3-capsule-primary svg {
+    width: 1.2em;
+    height: 1.2em;
+    flex: none;
+}
+
+.v3-capsule-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    transition:
+        background 0.2s,
+        transform 0.25s var(--v3-ease-spring);
+}
+.v3-capsule-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+.v3-capsule-secondary:active {
+    transform: scale(0.96);
+}
+
+/* ── Phase pill (testing screen segmented progress) ────────────── */
+.v3-phase-pill {
+    display: inline-flex;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 6px;
+    gap: 4px;
+}
+.v3-phase-seg {
+    position: relative;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition:
+        color 0.3s,
+        background 0.3s;
+}
+.v3-phase-seg.done {
+    color: rgba(255, 255, 255, 0.7);
+}
+.v3-phase-seg.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+        0 0 24px rgba(255, 255, 255, 0.12);
+}
+/* Per-segment status indicator: replace contents based on .active/.done */
+.v3-phase-seg .ind {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    box-sizing: border-box;
+    display: inline-block;
+}
+.v3-phase-seg.done .ind {
+    width: 12px;
+    height: 12px;
+    border-width: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-family: var(--font-mono);
+}
+.v3-phase-seg.done .ind::before {
+    content: "✓";
+}
+.v3-phase-seg.active .ind {
+    width: 6px;
+    height: 6px;
+    border: 0;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: v3-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes v3-dot-pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+}
+
+/* ── Live dot (small pulsing indicator for status rows) ───────────── */
+.v3-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    display: inline-block;
+    animation: v3-dot-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Metric chip (used by both testing readout and result tiles) ────── */
+.v3-metric-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: rgba(20, 20, 26, 0.55);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 12px 32px rgba(0, 0, 0, 0.4);
+    min-width: 144px;
+}
+.v3-metric-chip .label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+.v3-metric-chip .value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.v3-metric-chip .value {
+    font-variant-numeric: tabular-nums;
+    font-size: 30px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+}
+.v3-metric-chip .unit {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.14em;
+}
+
+/* ── Grade pill (result screen header) ─────────────────────── */
+.v3-grade-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 20px 10px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+.v3-grade-pill .badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: #0a0a0c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.02em;
+}
+.v3-grade-pill .caption {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+}
+/* Grade-specific badge colours — set on the pill via data-grade="S/A/B/C/D/F" */
+.v3-grade-pill[data-grade="S"] .badge {
+    background: linear-gradient(180deg, #f5d28a, #b07a3c);
+    box-shadow: 0 0 16px rgba(245, 210, 138, 0.4);
+}
+.v3-grade-pill[data-grade="A"] .badge {
+    background: linear-gradient(180deg, #e6e8ec, #9aa0aa);
+    box-shadow: 0 0 16px rgba(220, 225, 235, 0.35);
+}
+.v3-grade-pill[data-grade="B"] .badge {
+    background: linear-gradient(180deg, #b7d2ff, #5775b8);
+    box-shadow: 0 0 16px rgba(150, 180, 230, 0.3);
+}
+.v3-grade-pill[data-grade="C"] .badge {
+    background: linear-gradient(180deg, #c8c9cc, #76787c);
+    box-shadow: 0 0 12px rgba(180, 185, 195, 0.25);
+}
+.v3-grade-pill[data-grade="D"] .badge {
+    background: linear-gradient(180deg, #8a8a8e, #4a4a4e);
+}
+.v3-grade-pill[data-grade="F"] .badge {
+    background: linear-gradient(180deg, #5a5a60, #2a2a30);
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Capability strip (horizontal pills under the metric chips) ─────── */
+.v3-cap-strip {
+    display: flex;
+    flex-wrap: nowrap; /* force single row */
+    gap: 5px;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* clip any overflow gracefully */
+    width: 100%;
+}
+.v3-cap-strip .head {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    margin-right: 4px;
+}
+.v3-cap-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+}
+.v3-cap-pill::before {
+    content: "—";
+    opacity: 0.5;
+}
+.v3-cap-pill.on {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.92);
+}
+.v3-cap-pill.on::before {
+    content: "✓";
+    opacity: 1;
+}
+
+/* ── Result-screen disclaimer (one-line muted note) ─────────────── */
+.v3-disclaimer {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    line-height: 1.6;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+    max-width: 56ch;
+    text-transform: uppercase;
+    margin: 0 auto;
+}
+.v3-disclaimer .tag {
+    color: rgba(255, 255, 255, 0.55);
+    margin-right: 6px;
+    font-weight: 500;
+}
+
+/* ── App chrome (top-left brand + top-right icon row) ────────────── */
+.v3-chrome {
+    position: fixed;
+    z-index: 6;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.v3-chrome > * {
+    pointer-events: auto;
+}
+.v3-chrome.tl {
+    top: 22px;
+    left: 22px;
+}
+.v3-chrome.tr {
+    top: 22px;
+    right: 22px;
+}
+.v3-chrome .brand-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Breakpoint-specific chrome insets / typography ramps ──────────── */
+body[data-bp="tablet"] .v3-chrome.tl {
+    top: 18px;
+    left: 18px;
+}
+body[data-bp="tablet"] .v3-chrome.tr {
+    top: 18px;
+    right: 18px;
+}
+body[data-bp="mobile"] .v3-chrome.tl {
+    top: 16px;
+    left: 16px;
+}
+body[data-bp="mobile"] .v3-chrome.tr {
+    top: 16px;
+    right: 16px;
+}
+body[data-bp="mobile"] .v3-chrome .brand-name {
+    display: none;
+}
+
+/* ── Status bar (bottom-left persistent, hidden on mobile) ──────────── */
+.v3-status-bar {
+    position: fixed;
+    bottom: 28px;
+    left: 22px;
+    z-index: 5;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+@media (max-width: 767px) {
+    .v3-status-bar {
+        display: none;
+    }
+}
+body[data-bp="mobile"] .v3-status-bar {
+    display: none;
+}
+
+/* ── Idle screen layout ────────────────────────────────────────────── */
+#screen-idle {
+    /* override the legacy .landing flex/gap styles */
+    display: block;
+}
+.v3-idle-copy {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 60%;
+    text-align: center;
+    z-index: 3;
+    padding: 0 56px;
+    pointer-events: none;
+}
+.v3-idle-serif {
+    font-family: var(--v3-font-serif);
+    font-size: clamp(40px, 5.5vw, 64px);
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 auto 16px;
+    /* no max-width — let it flow naturally; container padding (56px) provides the bound */
+}
+.v3-idle-serif em {
+    font-style: normal;
+    font-family: var(--font-display);
+    font-weight: 300;
+}
+.v3-idle-sub {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+}
+.v3-idle-actions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 10%;
+    display: flex;
+    justify-content: center;
+    z-index: 5;
+    /* The full-width strip would otherwise eat pointer events on the empty
+       sides — block here, opt back in on the actual button so an enlarged
+       medal can still receive drag/pinch in the overlap. */
+    pointer-events: none;
+}
+.v3-idle-actions > .v3-capsule-primary {
+    pointer-events: auto;
+}
+#screen-idle .v3-capsule-primary {
+    padding: 26px 72px;
+    font-size: 17px;
+}
+
+/* — responsive — */
+@media (max-width: 1023px) {
+    .v3-idle-copy {
+        top: 64%;
+        padding: 0 40px;
+    }
+    .v3-idle-actions {
+        bottom: 12%;
+    }
+    #screen-idle .v3-capsule-primary {
+        padding: 24px 64px;
+        font-size: 16px;
+    }
+}
+/* Mobile idle: column stack (medal slot, then copy, then START at the bottom).
+   The slot becomes a flow item; the action stays anchored to the bottom
+   so the screen feels like an app screen rather than a centred poster. */
+@media (max-width: 767px) {
+    #screen-idle {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 32px;
+        padding: 90px 24px 100px;
+        min-height: 100vh;
+    }
+    .v3-idle-copy {
+        position: static !important;
+        top: auto !important;
+        padding: 0;
+    }
+    .v3-idle-serif {
+        font-size: 36px;
+    }
+    .v3-idle-actions {
+        position: absolute !important;
+        left: 0;
+        right: 0;
+        bottom: 8% !important;
+    }
+    #screen-idle .v3-capsule-primary {
+        padding: 18px 44px;
+        font-size: 13px;
+    }
+}
+body[data-bp="mobile"] #screen-idle {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 90px 24px 100px;
+    min-height: 100vh;
+}
+body[data-bp="mobile"] .v3-idle-copy {
+    position: static !important;
+    top: auto !important;
+    padding: 0;
+}
+body[data-bp="mobile"] .v3-idle-serif {
+    font-size: 36px;
+}
+body[data-bp="mobile"] .v3-idle-actions {
+    position: absolute !important;
+    left: 0;
+    right: 0;
+    bottom: 8% !important;
+}
+body[data-bp="mobile"] #screen-idle .v3-capsule-primary {
+    padding: 18px 44px;
+    font-size: 13px;
+}
+body[data-bp="tablet"] .v3-idle-copy {
+    top: 64%;
+    padding: 0 40px;
+}
+body[data-bp="tablet"] .v3-idle-actions {
+    bottom: 12%;
+}
+body[data-bp="tablet"] #screen-idle .v3-capsule-primary {
+    padding: 24px 64px;
+    font-size: 16px;
+}
+body[data-bp="mobile"] .v3-idle-copy {
+    top: 58%;
+    padding: 0 24px;
+}
+body[data-bp="mobile"] .v3-idle-serif {
+    font-size: 44px;
+}
+body[data-bp="mobile"] .v3-idle-actions {
+    bottom: 14%;
+}
+body[data-bp="mobile"] #screen-idle .v3-capsule-primary {
+    padding: 18px 44px;
+    font-size: 13px;
+}
+
+/* ── Testing screen layout ─────────────────────────────────────────── */
+
+/* Override legacy .step styles when inside the v3 phase pill */
+.v3-phase-pill .step {
+    padding: 8px 18px;
+    flex-direction: row;
+    opacity: 1 !important;
+    position: static;
+    gap: 8px;
+}
+.v3-phase-pill .step + .step {
+    border-left: none;
+}
+.v3-phase-pill .step.active {
+    opacity: 1 !important;
+}
+.v3-phase-pill .step.done {
+    opacity: 1 !important;
+}
+
+#screen-testing {
+    display: block; /* override any flex from legacy .testing */
+}
+
+/* Phase pill row — top centre at 11% */
+.v3-testing-pill-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 11%;
+    display: flex;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+}
+.v3-testing-pill-row > * {
+    pointer-events: auto;
+}
+
+/* Center live area */
+.v3-testing-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 4;
+    pointer-events: none;
+    text-shadow: 0 0 80px rgba(0, 0, 0, 0.95);
+}
+.v3-testing-caption {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 4px;
+    text-shadow: 0 0 24px rgba(0, 0, 0, 0.9);
+}
+.v3-testing-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    line-height: 1;
+}
+.v3-testing-number {
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(96px, 14vw, 168px);
+    font-weight: 200;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    font-family: var(--font-display);
+}
+.v3-testing-unit {
+    font-family: var(--font-mono);
+    font-size: clamp(14px, 1.6vw, 20px);
+    letter-spacing: 0.22em;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+}
+
+/* Bottom: chips + cancel */
+.v3-testing-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 5;
+}
+.v3-testing-chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.v3-testing-chips .v3-metric-chip .value {
+    font-size: 26px; /* slightly smaller than result chips */
+}
+
+/* — responsive — */
+/* Mobile testing: KEEP the fullscreen overlay layout.
+   Medal stays centred behind the streaks (it's the dim/translucent puck the
+   tunnel wraps around), the big number sits over it, the phase pill stays
+   anchored top, chips + cancel anchored bottom. Only sizes shrink. */
+@media (max-width: 767px) {
+    .v3-testing-bottom {
+        bottom: 8%;
+        gap: 14px;
+    }
+    .v3-testing-chips .v3-metric-chip:last-child {
+        display: none;
+    }
+    .v3-testing-chips .v3-metric-chip .value {
+        font-size: 22px;
+    }
+    .v3-testing-chips .v3-metric-chip {
+        padding: 10px 14px;
+        min-width: 120px;
+    }
+}
+body[data-bp="mobile"] .v3-testing-bottom {
+    bottom: 8%;
+    gap: 14px;
+}
+body[data-bp="mobile"] .v3-testing-chips .v3-metric-chip:last-child {
+    display: none;
+}
+body[data-bp="mobile"] .v3-testing-chips .v3-metric-chip .value {
+    font-size: 22px;
+}
+body[data-bp="mobile"] .v3-testing-chips .v3-metric-chip {
+    padding: 10px 14px;
+    min-width: 120px;
+}
+
+/* ── Result screen layout ─────────────────────────────────────────── */
+
+/* Screen-level pointer events: let medal canvas below receive drag/zoom */
+#screen-result {
+    display: block;
+    pointer-events: none;
+}
+/* Re-enable for interactive elements.
+   NOTE: .v3-chip-orbit is intentionally NOT here — it fills the screen
+   with inset:0 so must stay pointer-events:none; only .v3-orbit-chip
+   children opt back in. */
+#screen-result .v3-result-grade-row,
+#screen-result .v3-result-bottom,
+#screen-result .v3-medal-hint {
+    pointer-events: auto;
+}
+
+/* Grade pill text sub-line (incomplete / desc) */
+.v3-grade-pill-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.v3-grade-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* Grade pill row — top centre */
+.v3-result-grade-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 16%;
+    display: flex;
+    justify-content: center;
+    z-index: 5;
+}
+
+/* Top-left title — desktop/tablet */
+.v3-result-title {
+    position: absolute;
+    top: 96px;
+    left: 56px;
+    z-index: 5;
+    max-width: 320px;
+    pointer-events: none;
+}
+.v3-result-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 12px;
+}
+.v3-result-headline {
+    font-family: var(--v3-font-serif);
+    font-size: 44px;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+}
+.v3-result-headline em {
+    font-style: normal;
+    font-family: var(--font-display);
+    font-weight: 500;
+}
+
+/* Orbital chips container — fills the screen so chips can be positioned absolutely.
+   MUST stay pointer-events:none so the medal canvas below receives drag/zoom. */
+.v3-chip-orbit {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+.v3-orbit-chip {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    min-width: 156px;
+    pointer-events: auto; /* each chip opts back in individually */
+}
+/* Desktop orbit — ring = 360px, medal anchored at 46% */
+.v3-orbit-chip[data-chip="down"] {
+    left: calc(50% - 312px);
+    top: calc(46% - 180px);
+}
+.v3-orbit-chip[data-chip="up"] {
+    left: calc(50% + 312px);
+    top: calc(46% - 180px);
+}
+.v3-orbit-chip[data-chip="ping"] {
+    left: calc(50% + 312px);
+    top: calc(46% + 180px);
+}
+.v3-orbit-chip[data-chip="jitter"] {
+    left: calc(50% - 312px);
+    top: calc(46% + 180px);
+}
+
+/* Medal drag hint */
+.v3-medal-hint {
+    position: absolute;
+    right: 28px;
+    bottom: 100px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    z-index: 4;
+}
+
+/* Bottom bar */
+.v3-result-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    z-index: 5;
+    padding: 0 56px;
+}
+.v3-result-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 800px;
+}
+.v3-result-btn-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#screen-result .v3-capsule-primary {
+    padding: 26px 72px;
+    font-size: 17px;
+}
+#btn-share {
+    position: absolute;
+    left: calc(50% + 200px);
+}
+
+/* — responsive (tablet) —
+   Tighter orbit (±230 / ±130) so chips don't collide with the bottom bar.
+   Bottom moved to 16% to leave room for the cap strip + disclaimer line. */
+@media (max-width: 1023px) {
+    .v3-result-title {
+        top: 80px;
+        left: 40px;
+    }
+    .v3-result-headline {
+        font-size: 36px;
+    }
+    .v3-orbit-chip[data-chip="down"] {
+        left: calc(50% - 230px);
+        top: calc(46% - 130px);
+    }
+    .v3-orbit-chip[data-chip="up"] {
+        left: calc(50% + 230px);
+        top: calc(46% - 130px);
+    }
+    .v3-orbit-chip[data-chip="ping"] {
+        left: calc(50% + 230px);
+        top: calc(46% + 130px);
+    }
+    .v3-orbit-chip[data-chip="jitter"] {
+        left: calc(50% - 230px);
+        top: calc(46% + 130px);
+    }
+    .v3-result-bottom {
+        bottom: 6%;
+        padding: 0 32px;
+    }
+    #btn-share {
+        left: calc(50% + 160px);
+    }
+}
+
+/* — responsive (mobile) —
+   Switch from orbital chips to a vertical flex stack.
+   IMPORTANT: chip positioning rules above use [data-chip="..."] (specificity 0,2,1)
+   so we must match that specificity here — hence the !important and explicit
+   per-chip selectors. Without this the absolute positions leak through and the
+   stack collapses on top of the medal. */
+@media (max-width: 767px) {
+    /* Override the screen container: vertical column, scrollable */
+    #screen-result {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        pointer-events: auto !important;
+        gap: 18px;
+        padding: 76px 16px 24px;
+        overflow-y: auto;
+    }
+    /* Hide title + drag hint on mobile */
+    .v3-result-title,
+    .v3-medal-hint {
+        display: none !important;
+    }
+
+    /* Grade pill row — inline in the column */
+    .v3-result-grade-row {
+        position: static !important;
+    }
+
+    /* Chip orbit becomes a 2×2 grid */
+    .v3-chip-orbit {
+        position: static !important;
+        inset: auto !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 0;
+        width: 100%;
+        max-width: 420px;
+    }
+    /* Reset every orbital chip's absolute position */
+    .v3-orbit-chip,
+    .v3-orbit-chip[data-chip="down"],
+    .v3-orbit-chip[data-chip="up"],
+    .v3-orbit-chip[data-chip="ping"],
+    .v3-orbit-chip[data-chip="jitter"] {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        transform: none !important;
+        min-width: 0;
+        padding: 14px 16px;
+    }
+    .v3-orbit-chip .label {
+        font-size: 10px;
+    }
+    .v3-orbit-chip .value {
+        font-size: 26px;
+    }
+    .v3-orbit-chip .unit {
+        font-size: 12px;
+    }
+
+    /* Result bottom — inline below chips */
+    .v3-result-bottom {
+        position: static !important;
+        bottom: auto !important;
+        padding: 0;
+        gap: 14px;
+        width: 100%;
+        max-width: 420px;
+    }
+    .v3-result-info {
+        gap: 8px;
+    }
+    /* Buttons on mobile — sized to feel like real touch targets, not micro chips. */
+    #screen-result .v3-capsule-primary {
+        padding: 18px 36px !important;
+        font-size: 14px !important;
+    }
+    .v3-result-btn-row {
+        width: 100%;
+    }
+    #btn-share {
+        position: absolute;
+        left: calc(50% + 86px);
+    }
+    /* Capability strip: allow wrapping on mobile */
+    .v3-cap-strip {
+        flex-wrap: wrap !important;
+        gap: 4px;
+    }
+    .v3-cap-pill {
+        font-size: 8px;
+        padding: 4px 8px;
+    }
+
+    /* Share button inline next to Run Again */
+    .v3-result-btn-row {
+        display: flex !important;
+        flex-direction: row;
+        gap: 12px;
+        justify-content: center;
+        align-items: center;
+        position: static !important;
+    }
+    #btn-share {
+        position: static !important;
+        left: auto !important;
+        transform: none !important;
+    }
+    #screen-result .v3-icon-btn.lg {
+        width: 54px !important;
+        height: 54px !important;
+        border-radius: 16px !important;
+    }
+    #screen-result .v3-icon-btn.lg svg {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    /* Centre stack vertically when it fits, scroll otherwise */
+    #screen-result {
+        justify-content: center;
+        min-height: 100vh;
+    }
+    /* Status bar already hidden on mobile via media query */
+}
+
+/* data-bp overrides — mirror the media-query rules so JS can force a layout. */
+body[data-bp="tablet"] .v3-result-title {
+    top: 80px;
+    left: 40px;
+}
+body[data-bp="tablet"] .v3-result-headline {
+    font-size: 36px;
+}
+body[data-bp="tablet"] .v3-orbit-chip[data-chip="down"] {
+    left: calc(50% - 230px);
+    top: calc(46% - 130px);
+}
+body[data-bp="tablet"] .v3-orbit-chip[data-chip="up"] {
+    left: calc(50% + 230px);
+    top: calc(46% - 130px);
+}
+body[data-bp="tablet"] .v3-orbit-chip[data-chip="ping"] {
+    left: calc(50% + 230px);
+    top: calc(46% + 130px);
+}
+body[data-bp="tablet"] .v3-orbit-chip[data-chip="jitter"] {
+    left: calc(50% - 230px);
+    top: calc(46% + 130px);
+}
+body[data-bp="tablet"] .v3-result-bottom {
+    bottom: 6%;
+}
+body[data-bp="tablet"] #btn-share {
+    left: calc(50% + 160px);
+}
+
+body[data-bp="mobile"] #screen-result {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* vertically centre the stack */
+    pointer-events: auto !important;
+    gap: 16px;
+    padding: 76px 16px 24px;
+    overflow-y: auto;
+    min-height: 100vh;
+}
+/* On mobile result the medal is moved INLINE (see #medal-canvas.inline above);
+   no dim-as-background hack is needed because the canvas no longer fills the screen. */
+body[data-bp="mobile"] .v3-result-title,
+body[data-bp="mobile"] .v3-medal-hint {
+    display: none !important;
+}
+body[data-bp="mobile"] .v3-result-grade-row {
+    position: static !important;
+}
+body[data-bp="mobile"] .v3-chip-orbit {
+    position: static !important;
+    inset: auto !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0;
+    width: 100%;
+    max-width: 420px;
+}
+body[data-bp="mobile"] .v3-orbit-chip,
+body[data-bp="mobile"] .v3-orbit-chip[data-chip="down"],
+body[data-bp="mobile"] .v3-orbit-chip[data-chip="up"],
+body[data-bp="mobile"] .v3-orbit-chip[data-chip="ping"],
+body[data-bp="mobile"] .v3-orbit-chip[data-chip="jitter"] {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    min-width: 0;
+    padding: 14px 16px;
+}
+body[data-bp="mobile"] .v3-orbit-chip .label {
+    font-size: 10px;
+}
+body[data-bp="mobile"] .v3-orbit-chip .value {
+    font-size: 26px;
+}
+body[data-bp="mobile"] .v3-orbit-chip .unit {
+    font-size: 12px;
+}
+body[data-bp="mobile"] .v3-result-bottom {
+    position: static !important;
+    bottom: auto !important;
+    padding: 0;
+    gap: 14px;
+    width: 100%;
+    max-width: 420px;
+}
+body[data-bp="mobile"] #screen-result .v3-capsule-primary {
+    padding: 18px 36px !important;
+    font-size: 14px !important;
+}
+body[data-bp="mobile"] .v3-cap-strip {
+    flex-wrap: wrap !important;
+    gap: 4px;
+}
+body[data-bp="mobile"] .v3-cap-pill {
+    font-size: 8px;
+    padding: 4px 8px;
+}
+
+/* Mobile: Share button goes inline next to Run Again instead of floating absolutely.
+   The desktop default uses position:absolute; left:calc(50% + 200px) so we have
+   to override every property the desktop rule sets. */
+body[data-bp="mobile"] .v3-result-btn-row {
+    display: flex !important;
+    flex-direction: row;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    position: static !important;
+}
+body[data-bp="mobile"] #btn-share {
+    position: static !important;
+    left: auto !important;
+    transform: none !important;
+}
+body[data-bp="mobile"] #screen-result .v3-icon-btn.lg {
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 16px !important;
+}
+body[data-bp="mobile"] #screen-result .v3-icon-btn.lg svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+/* ── v3 Drawer (history + about) ───────────────────────────────────────────── */
+.v3-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(440px, 92vw);
+    z-index: 10;
+    background: rgba(8, 8, 12, 0.88);
+    backdrop-filter: blur(32px) saturate(150%);
+    -webkit-backdrop-filter: blur(32px) saturate(150%);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.5s var(--v3-ease-out);
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    gap: 24px;
+    overflow: hidden;
+}
+.v3-drawer.open {
+    transform: translateX(0);
+}
+
+.v3-drawer-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex: none;
+}
+.v3-drawer-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 8px;
+}
+.v3-drawer-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* History list */
+.v3-history-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+    flex: 1;
+}
+.v3-history-list::-webkit-scrollbar {
+    width: 3px;
+}
+.v3-history-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
+.v3-history-item {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background 0.2s;
+}
+.v3-history-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+.v3-history-meta {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+}
+.v3-history-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+.v3-history-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.v3-history-pair .val {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.9);
+}
+.v3-history-pair .lbl {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+}
+.v3-history-empty {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    padding: 48px 0;
+}
+
+/* About content */
+.v3-about-content {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding-right: 4px;
+    flex: 1;
+}
+.v3-about-content::-webkit-scrollbar {
+    width: 3px;
+}
+.v3-about-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
+.v3-about-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.v3-about-section-head {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 10px;
+}
+.v3-about-row {
+    display: flex;
+    gap: 16px;
+    align-items: baseline;
+    line-height: 1.5;
+}
+.v3-about-row .key {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    min-width: 76px;
+    flex: none;
+}
+.v3-about-row .val {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.55;
+}
+
+/* Grade rows in about */
+.v3-about-grade-row {
+    display: grid;
+    grid-template-columns: 28px 100px 90px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.v3-about-grade-row .grade {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
+    color: #0a0a0c;
+    flex: none;
+}
+.v3-about-grade-row .grade.s {
+    background: linear-gradient(180deg, #f5d28a, #b07a3c);
+}
+.v3-about-grade-row .grade.a {
+    background: linear-gradient(180deg, #e6e8ec, #9aa0aa);
+}
+.v3-about-grade-row .grade.b {
+    background: linear-gradient(180deg, #b7d2ff, #5775b8);
+}
+.v3-about-grade-row .grade.c {
+    background: linear-gradient(180deg, #c8c9cc, #76787c);
+}
+.v3-about-grade-row .grade.d {
+    background: linear-gradient(180deg, #8a8a8e, #4a4a4e);
+}
+.v3-about-grade-row .grade.f {
+    background: linear-gradient(180deg, #5a5a60, #2a2a30);
+    color: rgba(255, 255, 255, 0.5);
+}
+.v3-about-grade-row .title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+}
+.v3-about-grade-row .thresh {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.45);
+    font-variant-numeric: tabular-nums;
+}
+.v3-about-grade-row .desc {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.55);
+}

@@ -1,0 +1,766 @@
+/* ============================================================
+   Ultimate Speed Test — app wiring
+   - Shader background (ShaderRenderer)
+   - SpeedTest flow
+   - HUD updates, sparkline, stepper, grade, benchmarks
+   - History (localStorage), share, tweaks
+   ============================================================ */
+
+window.onload = init;
+
+function init() {
+  const body = document.body;
+
+  // ── Breakpoint detection ────────────────────────────────────────────────
+  // Drives the v3 responsive layout via CSS [data-bp="mobile|tablet|desktop"].
+  // Also feeds media-query-safe size variants without duplicating markup.
+  const setBreakpoint = () => {
+    const w = window.innerWidth;
+    body.dataset.bp = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+    placeMedalCanvas();
+  };
+
+  // ── Medal canvas re-parenting ─────────────────────────────────────
+  // On mobile, the design has the medal as a fixed-size inline element in
+  // the screen's column stack rather than a fullscreen overlay. We move the
+  // same canvas DOM node in/out of a `.v3-medal-slot` div inside whichever
+  // screen is currently active. Three.js keeps rendering across the move;
+  // only _resize() has to fire so the new bounding rect is picked up.
+  //
+  // Sizes (set in CSS via the slot's data-bp + screen scope):
+  //   #screen-idle    .v3-medal-slot → 260×260
+  //   #screen-result  .v3-medal-slot → 300×300
+  //
+  // Testing intentionally keeps the fullscreen overlay even on mobile —
+  // the lightspeed streaks emanate from the centre of the canvas, so the
+  // medal MUST be centred-fullscreen to read as 'sitting inside the tunnel'.
+  // The dim filter (set elsewhere) keeps it from competing with the number.
+  const INLINEABLE_PHASES = new Set(["idle", "result"]);
+  const placeMedalCanvas = () => {
+    const c = document.getElementById("medal-canvas");
+    if (!c) return;
+    const phase = body.dataset.phase || "idle";
+    const activeScreen = document.getElementById(`screen-${phase}`);
+    const slot =
+      body.dataset.bp === "mobile" &&
+      INLINEABLE_PHASES.has(phase) &&
+      activeScreen
+        ? activeScreen.querySelector(".v3-medal-slot")
+        : null;
+    const isInline = c.classList.contains("inline");
+
+    if (slot && c.parentNode !== slot) {
+      slot.appendChild(c);
+      c.classList.add("inline");
+    } else if (!slot && isInline) {
+      body.appendChild(c);
+      c.classList.remove("inline");
+    } else {
+      return; // no change needed
+    }
+    // Force the renderer to read the new size on the next frame.
+    // (typeof guard avoids a TDZ ReferenceError when this is called before
+    // `let medal` has been initialised — e.g. from the first setBreakpoint().)
+    requestAnimationFrame(() => {
+      try {
+        if (typeof medal !== "undefined" && medal && medal._resize)
+          medal._resize();
+      } catch {}
+    });
+  };
+
+  setBreakpoint();
+  window.addEventListener("resize", setBreakpoint);
+  // ---------- Shader background ----------
+  const dpr = Math.max(1, 0.5 * devicePixelRatio);
+  const canvas = document.getElementById("bg");
+  const resize = () => {
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    if (renderer) renderer.updateScale(dpr);
+  };
+  // .trim() is critical: the auto-formatter may indent the shader block,
+  // and GLSL requires #version to be the very first token (no leading whitespace).
+  const source = document.getElementById("frag").textContent.trim();
+  const renderer = new ShaderRenderer(canvas, dpr);
+  renderer.setup();
+  renderer.init();
+  resize();
+  const shaderError = renderer.test(source);
+  if (shaderError === null) {
+    renderer.updateShader(source);
+  } else {
+    console.error(
+      "[shader] Compile failed — falling back to default UV gradient.",
+    );
+    console.error("[shader] Error:", shaderError.slice(0, 300));
+    console.error(
+      "[shader] Source starts with:",
+      JSON.stringify(source.slice(0, 60)),
+    );
+  }
+  window.onresize = resize;
+
+  // ---------- Pointer tracking ----------
+  const pointerState = { x: 0, y: 0, count: 1 };
+  window.addEventListener("pointermove", (e) => {
+    const x = (e.clientX / innerWidth) * 2 - 1;
+    const y = 1 - (e.clientY / innerHeight) * 2;
+    pointerState.x = x;
+    pointerState.y = y;
+    renderer.updateMouse([x, y]);
+    renderer.updatePointerCoords([x, y]);
+    const ptr = document.getElementById("hud-ptr");
+    if (ptr)
+      ptr.textContent = `${x >= 0 ? "+" : ""}${x.toFixed(2)}, ${y >= 0 ? "+" : ""}${y.toFixed(2)}`;
+  });
+  renderer.updatePointerCount(1);
+
+  // ---------- Shader uniforms state ----------
+  // phase is continuous (0 idle, 1 testing, 2 result); burst is a one-shot fade (1→0 over ~1s)
+  const shaderState = { speed: 0.0, phase: 0.0, phaseTarget: 0.0, burst: 0.0 };
+  const tweaks = loadTweaks();
+  applyDensity(tweaks.density);
+
+  renderer.setExtraUniformProvider(() => ({
+    speed: Math.min(shaderState.speed * tweaks.intensity, 1.0),
+    phase: shaderState.phase,
+    burst: shaderState.burst,
+  }));
+
+  // ---------- Render loop ----------
+  let lastT = 0;
+  const loop = (now) => {
+    const dt = Math.min(0.05, (now - lastT) / 1000 || 0);
+    lastT = now;
+
+    // Smoothly interpolate phase toward target
+    shaderState.phase +=
+      (shaderState.phaseTarget - shaderState.phase) * Math.min(1, dt * 2.0);
+
+    // Decay burst (~1.1s lifetime)
+    if (shaderState.burst > 0.001)
+      shaderState.burst = Math.max(0, shaderState.burst - dt * 0.9);
+    else shaderState.burst = 0;
+
+    if (shaderState.phaseTarget < 0.5) {
+      // idle — starfield, tiny breathing
+      shaderState.speed = 0.04 + 0.02 * Math.sin(now * 0.0007);
+    } else if (shaderState.phaseTarget > 1.5) {
+      // result — near zero, embers only
+      shaderState.speed *= 0.95;
+    }
+
+    const hs = document.getElementById("hud-shader");
+    if (hs)
+      hs.textContent = (shaderState.speed * tweaks.intensity).toFixed(2) + "×";
+    renderer.render(now);
+    requestAnimationFrame(loop);
+  };
+  loop(0);
+
+  // ---------- Clock ----------
+  const clock = document.getElementById("foot-clock");
+  const tick = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    clock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} UTC${d.getTimezoneOffset() <= 0 ? "+" : "-"}${pad(Math.abs(d.getTimezoneOffset() / 60) | 0)}`;
+  };
+  tick();
+  setInterval(tick, 1000);
+
+  // ---------- Medal (three.js) ----------
+  const medalCanvas = document.getElementById("medal-canvas");
+  let medal = null;
+  try {
+    if (window.Medal) medal = new Medal(medalCanvas);
+  } catch (e) {
+    console.warn("[medal]", e);
+  }
+
+  // ---------- Screens ----------
+  const screens = {
+    idle: document.getElementById("screen-idle"),
+    testing: document.getElementById("screen-testing"),
+    result: document.getElementById("screen-result"),
+  };
+  const showScreen = (name) => {
+    Object.entries(screens).forEach(([k, el]) =>
+      el.classList.toggle("active", k === name),
+    );
+    body.dataset.phase = name;
+    placeMedalCanvas(); // re-parent canvas if entering/leaving mobile result
+    const hp = document.getElementById("hud-phase");
+    if (hp) hp.textContent = name.toUpperCase();
+    // Medal is interactive on idle + result; testing keeps it passive
+    // so the user can't accidentally interrupt the live readout's framing.
+    if (medal) medal.setActive(name === "result" || name === "idle");
+  };
+  showScreen("idle");
+
+  // ---------- Utils ----------
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d = 2) => Number(v).toFixed(d);
+  const setLive = (value, unit, d = 2) => {
+    $("live-value").textContent = fmt(value, d);
+    $("live-unit").textContent = unit;
+  };
+  const setStep = (name, state /* 'active'|'done' */, p = 0) => {
+    document.querySelectorAll(".step").forEach((s) => {
+      if (s.dataset.step === name) {
+        s.classList.remove("done", "active");
+        s.classList.add(state);
+        s.style.setProperty("--p", p);
+      }
+    });
+  };
+  const markDone = (name) => {
+    const el = document.querySelector(`.step[data-step="${name}"]`);
+    if (el) {
+      el.classList.remove("active");
+      el.classList.add("done");
+      el.style.setProperty("--p", 1);
+    }
+  };
+
+  // ---------- Sparkline ----------
+  const sparkLine = $("spark-line");
+  const sparkFill = $("spark-fill");
+  const sparkData = [];
+  const pushSpark = (mbps) => {
+    sparkData.push(mbps);
+    if (sparkData.length > 80) sparkData.shift();
+    const max = Math.max(1, ...sparkData);
+    const W = 200,
+      H = 48;
+    const pts = sparkData.map((v, i) => {
+      const x = (i / Math.max(1, sparkData.length - 1)) * W;
+      const y = H - (v / max) * (H - 4) - 2;
+      return [x, y];
+    });
+    const line = pts
+      .map(
+        (p, i) =>
+          (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1),
+      )
+      .join(" ");
+    const fill = line + ` L${W},${H} L0,${H} Z`;
+    sparkLine.setAttribute("d", line);
+    sparkFill.setAttribute("d", fill);
+  };
+  const resetSpark = () => {
+    sparkData.length = 0;
+    sparkLine.setAttribute("d", "");
+    sparkFill.setAttribute("d", "");
+  };
+
+  // ---------- Test flow ----------
+  let peakMbps = 0,
+    totalBytes = 0,
+    sampleCount = 0,
+    t0 = 0;
+  let elapsedTimer = null;
+
+  const resetTelemetry = () => {
+    peakMbps = 0;
+    totalBytes = 0;
+    sampleCount = 0;
+    t0 = performance.now();
+    $("hud-peak").textContent = "0.00 Mbps";
+    $("hud-avg").textContent = "0.00 Mbps";
+    $("hud-samples").textContent = "0";
+    $("hud-bytes").textContent = "0 MB";
+    $("hud-elapsed").textContent = "00.0s";
+    $("hud-sid").textContent = Math.random()
+      .toString(36)
+      .slice(2, 8)
+      .toUpperCase();
+    resetSpark();
+    document.querySelectorAll(".step").forEach((s) => {
+      s.classList.remove("active", "done");
+      s.style.setProperty("--p", 0);
+    });
+    $("progress-fill").style.width = "0%";
+  };
+
+  const startTest = async () => {
+    showScreen("testing");
+    shaderState.phaseTarget = 1.0;
+    shaderState.speed = 0.0;
+    shaderState.burst = 0.0;
+    // Reset medal to procedural puck so the GLB from a prior run is cleared.
+    if (medal) {
+      medal.reset();
+      // Begin testing phase — medal will fade from transparent to solid.
+      medal.startTesting();
+    }
+    resetTelemetry();
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(() => {
+      const e = (performance.now() - t0) / 1000;
+      $("hud-elapsed").textContent = e.toFixed(1) + "s";
+    }, 100);
+
+    const test = new SpeedTest();
+
+    // Track best-known values per phase so we can still produce a result
+    // even if a later phase fails (e.g. sandboxed CORS blocks upload).
+    const partial = { ping: 0, jitter: 0, download: 0, upload: 0 };
+
+    // Tracks whether upload was unmeasurable due to CORS/network.
+    // Set by the 'warning' event; consumed in finaliseResults.
+    let uploadBlocked = false;
+    test.on("warning", ({ type }) => {
+      if (type === "upload-unmeasurable") {
+        uploadBlocked = true;
+        $("live-caption").textContent =
+          "UPLOAD SIGNAL BLOCKED · CORS RESTRICTION";
+      }
+    });
+
+    test.on("phase", ({ phase }) => {
+      if (phase === "ping") {
+        setStep("ping", "active", 0.05);
+        $("live-caption").textContent = "MEASURING LATENCY";
+        setLive(0, "ms", 1);
+      } else if (phase === "download") {
+        markDone("ping");
+        setStep("download", "active", 0.05);
+        $("live-caption").textContent = "DOWNSTREAM · 6 PARALLEL STREAMS";
+        setLive(0, "Mbps");
+        peakMbps = 0;
+        resetSpark();
+      } else if (phase === "upload") {
+        markDone("download");
+        setStep("upload", "active", 0.05);
+        $("live-caption").textContent = "UPSTREAM · 4 PARALLEL STREAMS";
+        setLive(0, "Mbps");
+        peakMbps = 0;
+        resetSpark();
+        // Pre-warm the medal model for the predicted grade so it's ready
+        // by the time the upload phase ends (~10s of free background bandwidth).
+        if (medal && partial.download > 0) {
+          const predicted = gradeFor(partial.download).letter;
+          medal.preloadModel(predicted);
+        }
+      }
+    });
+
+    test.on("progress", ({ phase, mbps, progress, ping }) => {
+      sampleCount++;
+      $("hud-samples").textContent = sampleCount;
+      const pctTotal =
+        phase === "ping"
+          ? progress * 0.2
+          : phase === "download"
+            ? 0.2 + progress * 0.45
+            : 0.65 + progress * 0.35;
+      $("progress-fill").style.width = (pctTotal * 100).toFixed(1) + "%";
+
+      const step = document.querySelector(`.step[data-step="${phase}"]`);
+      if (step) step.style.setProperty("--p", progress);
+
+      if (phase === "ping") {
+        if (ping != null) {
+          setLive(ping, "ms", 1);
+          partial.ping = ping;
+        }
+        shaderState.speed = 0.15 + Math.min(ping || 0, 200) / 400;
+      } else {
+        setLive(mbps, "Mbps");
+        if (mbps > peakMbps) peakMbps = mbps;
+        if (phase === "download")
+          partial.download = Math.max(partial.download, mbps);
+        if (phase === "upload") partial.upload = Math.max(partial.upload, mbps);
+        // v3 chips show the unit separately, so write numbers only.
+        $("hud-peak").textContent = peakMbps.toFixed(1);
+        const elapsed = Math.max(0.1, (performance.now() - t0) / 1000);
+        $("hud-avg").textContent = mbps.toFixed(1);
+        $("hud-bytes").textContent = ((mbps * elapsed) / 8).toFixed(1) + " MB";
+        pushSpark(mbps);
+        shaderState.speed = Math.min(mbps / 800, 1.0);
+      }
+    });
+
+    // Shared finalisation — runs for both a clean 'done' and a partial error.
+    let finalised = false;
+    const finaliseResults = (results, { incomplete = false } = {}) => {
+      if (finalised) return;
+      finalised = true;
+      markDone("upload");
+      if (elapsedTimer) clearInterval(elapsedTimer);
+
+      // Populate result
+      $("r-down").textContent = fmt(results.download, 2);
+      // Show 'N/A' if upload was blocked by CORS (rather than misleading '0.00')
+      $("r-up").textContent =
+        uploadBlocked && results.upload === 0 ? "N/A" : fmt(results.upload, 2);
+      $("r-ping").textContent = fmt(results.ping, 1);
+      $("r-jitter").textContent = fmt(results.jitter, 1);
+
+      const d = new Date();
+      $("result-date").textContent = d
+        .toLocaleString("en-US", {
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .toUpperCase();
+
+      const { letter, title, desc } = gradeFor(results.download);
+      $("grade-letter").textContent = letter;
+      $("grade-title").textContent = title;
+      $("grade-desc").textContent = incomplete
+        ? "Partial result · upload blocked"
+        : desc;
+      // v3: update data-grade on the pill so CSS applies the right badge colour
+      const pill = $("grade-pill");
+      if (pill) pill.dataset.grade = letter;
+
+      if (medal)
+        medal.setGrade(
+          letter,
+          title,
+          d.getTime().toString(36).slice(-4).toUpperCase(),
+        );
+
+      document.querySelectorAll(".bench-row").forEach((row) => {
+        const min = Number(row.dataset.min);
+        const ok = results.download >= min;
+        row.classList.toggle("on", ok);
+        row.classList.toggle("off", !ok);
+        row.querySelector(".bench-check").classList.toggle("on", ok);
+      });
+
+      saveHistory({ at: d.toISOString(), ...results, grade: letter });
+
+      // Cinematic handoff: flash + shockwave ring + medal spring-in.
+      // End the testing phase and trigger the spring-in animation.
+      shaderState.burst = 1.0;
+      if (medal) {
+        medal.endTesting();
+        medal.burstIn();
+      }
+      setTimeout(() => {
+        shaderState.phaseTarget = 2.0;
+        shaderState.speed = Math.min(results.download / 1000, 0.5);
+        showScreen("result");
+      }, 280);
+    };
+
+    test.on("done", (results) => finaliseResults(results));
+
+    test.on("error", (err) => {
+      console.error("[test]", err);
+      $("live-caption").textContent = "UPLINK BLOCKED — SHOWING PARTIAL";
+      finaliseResults({ ...partial }, { incomplete: true });
+    });
+
+    try {
+      await test.run();
+    } catch (e) {
+      // Swallowed — error handler above has already finalised.
+    }
+  };
+
+  // ---------- Grading ----------
+  function gradeFor(down) {
+    if (down >= 500)
+      return {
+        letter: "S",
+        title: "LIGHTSPEED",
+        desc: "Top tier · fibre class",
+      };
+    if (down >= 200)
+      return { letter: "A", title: "EXCELLENT", desc: "Gigabit territory" };
+    if (down >= 80)
+      return { letter: "B", title: "STRONG", desc: "Premium broadband" };
+    if (down >= 25)
+      return { letter: "C", title: "STEADY", desc: "Solid everyday link" };
+    if (down >= 5)
+      return { letter: "D", title: "LIMITED", desc: "Basic connectivity" };
+    return { letter: "F", title: "CRITICAL", desc: "Below threshold" };
+  }
+
+  // ---------- History ----------
+  const HKEY = "ust:history";
+  function loadHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(HKEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function saveHistory(entry) {
+    const list = loadHistory();
+    list.unshift(entry);
+    localStorage.setItem(HKEY, JSON.stringify(list.slice(0, 30)));
+    renderHistory();
+  }
+  function renderHistory() {
+    const list = loadHistory();
+    const el = $("history-list");
+    if (!list.length) {
+      el.innerHTML = '<div class="v3-history-empty">NO RUNS YET</div>';
+      return;
+    }
+    el.innerHTML = list
+      .map((h) => {
+        const d = new Date(h.at);
+        const t = d
+          .toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })
+          .toUpperCase();
+        const up = h.upload > 0 ? fmt(h.upload, 1) : "N/A";
+        return `<div class="v3-history-item">
+          <div class="v3-history-meta">${t} · GRADE ${h.grade || "—"}</div>
+          <div class="v3-history-metrics">
+            <div class="v3-history-pair"><span class="val">${fmt(h.download, 1)}</span><span class="lbl">DOWN</span></div>
+            <div class="v3-history-pair"><span class="val">${up}</span><span class="lbl">UP</span></div>
+            <div class="v3-history-pair"><span class="val">${fmt(h.ping, 0)}</span><span class="lbl">PING</span></div>
+            <div class="v3-history-pair"><span class="val">${fmt(h.jitter, 0)}</span><span class="lbl">JIT</span></div>
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+  renderHistory();
+
+  const drawer = $("history-drawer");
+  const openDrawer = () => {
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+  };
+  const closeDrawer = () => {
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+  };
+  $("nav-history").addEventListener("click", openDrawer);
+  $("btn-history").addEventListener("click", openDrawer);
+  $("drawer-close").addEventListener("click", closeDrawer);
+
+  // ---------- About drawer ----------
+  const aboutDrawer = $("about-drawer");
+  const openAbout = () => {
+    aboutDrawer.classList.add("open");
+    aboutDrawer.setAttribute("aria-hidden", "false");
+  };
+  const closeAbout = () => {
+    aboutDrawer.classList.remove("open");
+    aboutDrawer.setAttribute("aria-hidden", "true");
+  };
+  $("nav-about").addEventListener("click", openAbout);
+  $("about-close").addEventListener("click", closeAbout);
+
+  // ---------- Share ----------
+  const toast = $("toast");
+  const showToast = (msg) => {
+    toast.textContent = msg;
+    toast.classList.add("on");
+    setTimeout(() => toast.classList.remove("on"), 1600);
+  };
+  // ── Share modal wiring ─────────────────────────────────────────────
+  // The share button no longer hands directly to the OS share sheet.
+  // Instead it generates a card, displays it in our own in-app modal,
+  // and lets the user pick between Download / Copy / Native share.
+  // This gives us a consistent look across platforms (Windows, macOS,
+  // iOS, Android all show the same UI) and lets us use the proper
+  // ClipboardItem API for image-on-clipboard pastes that actually work
+  // in Word, chat clients, image editors etc.
+  const shareModal = $("share-modal");
+  const sharePreview = $("share-modal-preview");
+  const shareHint = $("share-modal-hint");
+  let shareCardCanvas = null; // the most recently built card
+
+  const openShareModal = () => {
+    shareModal.classList.add("open");
+    shareModal.setAttribute("aria-hidden", "false");
+  };
+  const closeShareModal = () => {
+    shareModal.classList.remove("open");
+    shareModal.setAttribute("aria-hidden", "true");
+    // Drop the canvas reference so the GC can reclaim it
+    shareCardCanvas = null;
+    // Clear preview after the close animation finishes
+    setTimeout(() => {
+      if (!shareModal.classList.contains("open")) sharePreview.innerHTML = "";
+    }, 300);
+  };
+
+  $("share-modal-close").addEventListener("click", closeShareModal);
+  $("share-modal-backdrop").addEventListener("click", closeShareModal);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && shareModal.classList.contains("open")) {
+      closeShareModal();
+    }
+  });
+
+  // Hide capability-gated buttons up front. Don't probe in the click
+  // handler — we want the layout to settle once.
+  if (window.ShareCard) {
+    if (!window.ShareCard.canCopyImage())
+      $("share-action-copy").hidden = true;
+    if (!window.ShareCard.canNativeShare())
+      $("share-action-native").hidden = true;
+  }
+
+  $("btn-share").addEventListener("click", () => {
+    // Pull the live result values straight off the DOM so the share
+    // image matches exactly what the user sees on the result screen.
+    const results = {
+      download: $("r-down").textContent,
+      upload: $("r-up").textContent,
+      ping: $("r-ping").textContent,
+    };
+    const grade = {
+      letter: $("grade-letter").textContent,
+      title: $("grade-title").textContent,
+    };
+    const uploadBlocked = results.upload === "N/A";
+
+    // Build the card synchronously (no async needed for the image step)
+    if (!window.ShareCard || !medal || typeof medal.captureFrame !== "function") {
+      // Final-ditch fallback to text copy if anything's missing
+      const text = `ULTIMATE SPEED TEST — ${results.download} Mbps ↓ · ${results.upload}${uploadBlocked ? "" : " Mbps"} ↑ · ${results.ping} ms · Grade ${grade.letter}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => showToast("COPIED TO CLIPBOARD"));
+      } else {
+        showToast(text);
+      }
+      return;
+    }
+
+    try {
+      const medalFrame = medal.captureFrame(1024);
+      shareCardCanvas = window.ShareCard.build({
+        medalCanvas: medalFrame,
+        results,
+        grade,
+        uploadBlocked,
+      });
+      // Mount the canvas itself into the preview (no encoding overhead)
+      sharePreview.innerHTML = "";
+      sharePreview.appendChild(shareCardCanvas);
+      shareHint.textContent =
+        "1080×1350 PNG · Renders locally, never uploaded";
+      openShareModal();
+    } catch (err) {
+      console.warn("[share] card build failed:", err);
+      showToast("SHARE FAILED");
+    }
+  });
+
+  // ── Modal action buttons ───────────────────────────────────────────
+  $("share-action-download").addEventListener("click", async () => {
+    if (!shareCardCanvas) return;
+    try {
+      await window.ShareCard.download(shareCardCanvas);
+      shareHint.textContent = "Saved to your downloads folder.";
+    } catch (err) {
+      console.warn("[share] download failed:", err);
+      shareHint.textContent = "Download failed — try again?";
+    }
+  });
+
+  $("share-action-copy").addEventListener("click", async () => {
+    if (!shareCardCanvas) return;
+    try {
+      await window.ShareCard.copyToClipboard(shareCardCanvas);
+      shareHint.textContent = "Copied! Paste anywhere — Word, chat, mail.";
+    } catch (err) {
+      console.warn("[share] copy failed:", err);
+      shareHint.textContent = "Copy not allowed — try Download instead.";
+    }
+  });
+
+  $("share-action-native").addEventListener("click", async () => {
+    if (!shareCardCanvas) return;
+    const text = `ULTIMATE SPEED TEST — ${$("r-down").textContent} Mbps ↓ · ${$("r-up").textContent} Mbps ↑ · ${$("r-ping").textContent} ms · Grade ${$("grade-letter").textContent}`;
+    try {
+      const status = await window.ShareCard.nativeShare(shareCardCanvas, text);
+      if (status === "shared") {
+        shareHint.textContent = "Shared.";
+        // Auto-close after a successful share so they're not stuck staring at the dialog
+        setTimeout(closeShareModal, 600);
+      } else if (status === "cancelled") {
+        shareHint.textContent = "Share cancelled.";
+      }
+    } catch (err) {
+      console.warn("[share] native share failed:", err);
+      shareHint.textContent = "Share unavailable — use Download or Copy.";
+    }
+  });
+
+  // ---------- About ----------
+  // nav-about now opens the about drawer (wired above)
+
+  // ---------- Buttons ----------
+  $("btn-start").addEventListener("click", startTest);
+  $("btn-restart").addEventListener("click", startTest);
+  // Cancel: reload the page to abort the running test cleanly.
+  // A proper abort-controller approach can be wired later.
+  const btnCancel = $("btn-cancel");
+  if (btnCancel) btnCancel.addEventListener("click", () => location.reload());
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && body.dataset.phase === "idle") {
+      e.preventDefault();
+      startTest();
+    }
+    if (e.code === "Escape") {
+      if (drawer.classList.contains("open")) closeDrawer();
+      if (aboutDrawer.classList.contains("open")) closeAbout();
+    }
+  });
+
+  // ---------- Tweaks ----------
+  function loadTweaks() {
+    return Object.assign({}, TWEAK_DEFAULTS);
+  }
+  function applyDensity(d) {
+    body.dataset.density = d;
+    document.querySelectorAll("#tweaks-panel .seg button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.density === d);
+    });
+  }
+
+  const tPanel = document.getElementById("tweaks-panel");
+  const tIntensity = document.getElementById("tw-intensity");
+  const tIntensityVal = document.getElementById("tw-i-val");
+  tIntensity.value = tweaks.intensity;
+  tIntensityVal.textContent = tweaks.intensity.toFixed(1) + "×";
+  tIntensity.addEventListener("input", () => {
+    tweaks.intensity = parseFloat(tIntensity.value);
+    tIntensityVal.textContent = tweaks.intensity.toFixed(1) + "×";
+    window.parent.postMessage(
+      { type: "__edit_mode_set_keys", edits: { intensity: tweaks.intensity } },
+      "*",
+    );
+  });
+  document.querySelectorAll("#tweaks-panel .seg button").forEach((b) => {
+    b.addEventListener("click", () => {
+      tweaks.density = b.dataset.density;
+      applyDensity(tweaks.density);
+      window.parent.postMessage(
+        { type: "__edit_mode_set_keys", edits: { density: tweaks.density } },
+        "*",
+      );
+    });
+  });
+
+  // Tweaks host protocol — register listener FIRST, then announce
+  window.addEventListener("message", (e) => {
+    const t = e.data && e.data.type;
+    if (t === "__activate_edit_mode") tPanel.classList.add("on");
+    else if (t === "__deactivate_edit_mode") tPanel.classList.remove("on");
+  });
+  try {
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+  } catch {}
+}

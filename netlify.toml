@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────────
+# Netlify configuration — Ultimate Speed Test
+# ─────────────────────────────────────────────────────────────────
+# Deploy setup:
+#   • If deploying the `app/` folder as the site root (drag-drop
+#     or `netlify deploy --dir .` run from inside app/), this file
+#     must live alongside index.html — which it does.
+#   • If deploying from a parent repo, set [build] publish = "app"
+#     and move this file to the repo root instead.
+
+[build]
+  # No build step — this is a pure static site.
+  publish = "."
+  command = ""
+
+# ── Edge Function: CORS-safe upload measurement sink ─────────────
+# Handles large binary POST bodies via streaming (no 6 MB limit).
+# speedtest.js probes this path at startup; if it responds, the
+# upload phase sends data here instead of speed.cloudflare.com/__up
+# (which CORS-blocks requests from non-Cloudflare origins).
+[[edge_functions]]
+  path    = "/api/upload"
+  function = "upload"
