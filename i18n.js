@@ -72,6 +72,14 @@ const I18N = (() => {
       "share.download": "下載",
       "share.upload": "上傳",
       "share.ping": "Ping",
+      "share.modal.eyebrow": "// 分享",
+      "share.modal.title": "結果截圖",
+      "share.modal.download": "下載",
+      "share.modal.copy": "複製",
+      "share.modal.share": "分享…",
+      "share.modal.hint": "1080×1350 PNG · 本地渲染，永不上傳",
+      "toast.copied": "已複製",
+      "toast.shareFailed": "分享失敗",
     },
 
     en: {
@@ -130,6 +138,14 @@ const I18N = (() => {
       "share.download": "Download",
       "share.upload": "Upload",
       "share.ping": "Ping",
+      "share.modal.eyebrow": "// SHARE",
+      "share.modal.title": "Result snapshot",
+      "share.modal.download": "DOWNLOAD",
+      "share.modal.copy": "COPY",
+      "share.modal.share": "SHARE…",
+      "share.modal.hint": "1080×1350 PNG · Renders locally, never uploaded",
+      "toast.copied": "LINK COPIED",
+      "toast.shareFailed": "SHARE FAILED",
     },
 
     es: {
@@ -188,6 +204,14 @@ const I18N = (() => {
       "share.download": "Descarga",
       "share.upload": "Carga",
       "share.ping": "Ping",
+      "share.modal.eyebrow": "// COMPARTIR",
+      "share.modal.title": "Captura de resultado",
+      "share.modal.download": "DESCARGAR",
+      "share.modal.copy": "COPIAR",
+      "share.modal.share": "COMPARTIR…",
+      "share.modal.hint": "PNG 1080×1350 · Se procesa localmente, nunca se carga",
+      "toast.copied": "ENLACE COPIADO",
+      "toast.shareFailed": "COMPARTIR FALLÓ",
     },
 
     ja: {
@@ -246,6 +270,14 @@ const I18N = (() => {
       "share.download": "ダウンロード",
       "share.upload": "アップロード",
       "share.ping": "Ping",
+      "share.modal.eyebrow": "// 共有",
+      "share.modal.title": "結果スナップショット",
+      "share.modal.download": "ダウンロード",
+      "share.modal.copy": "コピー",
+      "share.modal.share": "共有…",
+      "share.modal.hint": "1080×1350 PNG · ローカルでレンダリング、アップロード不可",
+      "toast.copied": "リンク コピーしました",
+      "toast.shareFailed": "共有に失敗しました",
     },
   };
 

@@ -750,8 +750,8 @@
             <div class="share-modal-card" role="document">
                 <div class="share-modal-head">
                     <div>
-                        <div class="share-modal-eyebrow">// SHARE</div>
-                        <h3 class="share-modal-title">Result snapshot</h3>
+                        <div class="share-modal-eyebrow" data-i18n="share.modal.eyebrow">// SHARE</div>
+                        <h3 class="share-modal-title" data-i18n="share.modal.title">Result snapshot</h3>
                     </div>
                     <button
                         class="v3-icon-btn"
@@ -796,7 +796,7 @@
                             <polyline points="6,10 10,14 14,10" />
                             <line x1="4" y1="17" x2="16" y2="17" />
                         </svg>
-                        <span>DOWNLOAD</span>
+                        <span data-i18n="share.modal.download">DOWNLOAD</span>
                     </button>
                     <button
                         class="share-action"
@@ -815,7 +815,7 @@
                             <rect x="6" y="6" width="10" height="10" rx="1.6" />
                             <path d="M4 13V5a1 1 0 0 1 1-1h8" />
                         </svg>
-                        <span>COPY</span>
+                        <span data-i18n="share.modal.copy">COPY</span>
                     </button>
                     <button
                         class="share-action"
@@ -834,18 +834,18 @@
                             <path d="M14 7 V4 L18 8 L14 12 V9" />
                             <path d="M14 8 H9 a4 4 0 0 0 -4 4 v4" />
                         </svg>
-                        <span>SHARE…</span>
+                        <span data-i18n="share.modal.share">SHARE…</span>
                     </button>
                 </div>
 
-                <div class="share-modal-hint" id="share-modal-hint">
+                <div class="share-modal-hint" id="share-modal-hint" data-i18n="share.modal.hint">
                     1080×1350 PNG · Renders locally, never uploaded
                 </div>
             </div>
         </div>
 
         <!-- Share toast -->
-        <div class="toast" id="toast">LINK COPIED</div>
+        <div class="toast" id="toast" data-i18n="toast.copied">LINK COPIED</div>
 
         <script>
             const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {

@@ -688,7 +688,7 @@ function init() {
       // Final-ditch fallback to text copy if anything's missing
       const text = `ULTIMATE SPEED TEST — ${results.download} Mbps ↓ · ${results.upload}${uploadBlocked ? "" : " Mbps"} ↑ · ${results.ping} ms · Grade ${grade.letter}`;
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => showToast("COPIED TO CLIPBOARD"));
+        navigator.clipboard.writeText(text).then(() => showToast(I18N.get("toast.copied")));
       } else {
         showToast(text);
       }
@@ -706,12 +706,11 @@ function init() {
       // Mount the canvas itself into the preview (no encoding overhead)
       sharePreview.innerHTML = "";
       sharePreview.appendChild(shareCardCanvas);
-      shareHint.textContent =
-        "1080×1350 PNG · Renders locally, never uploaded";
+      shareHint.textContent = I18N.get("share.modal.hint");
       openShareModal();
     } catch (err) {
       console.warn("[share] card build failed:", err);
-      showToast("SHARE FAILED");
+      showToast(I18N.get("toast.shareFailed"));
     }
   });
 
