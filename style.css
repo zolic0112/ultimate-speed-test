@@ -78,16 +78,17 @@ button {
 #bg,
 #medal-canvas {
     position: fixed;
-    top: calc(-1 * env(safe-area-inset-top, 0px));
-    left: calc(-1 * env(safe-area-inset-left, 0px));
-    width: calc(
-        100vw + env(safe-area-inset-left, 0px) +
-            env(safe-area-inset-right, 0px)
-    );
-    height: calc(
-        100dvh + env(safe-area-inset-top, 0px) +
-            env(safe-area-inset-bottom, 0px)
-    );
+    top: 0;
+    left: 0;
+    /* Use 100lvh (large viewport height) — this is the viewport at its
+       MAX height, with toolbar hidden / safe-area included. Unlike 100dvh
+       which can shrink, lvh is stable and reliably reaches the home
+       indicator strip on iOS PWAs.
+       Fallback chain for older browsers: vh → dvh → lvh. */
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    height: 100lvh;
     display: block;
 }
 #bg {
