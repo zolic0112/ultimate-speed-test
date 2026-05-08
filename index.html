@@ -29,6 +29,7 @@
             rel="stylesheet"
         />
         <link rel="stylesheet" href="style.css" />
+        <script src="i18n.js"></script>
 
         <script type="x-shader/x-fragment" id="frag">
             #version 300 es
@@ -264,10 +265,10 @@
 
                 <!-- Serif italic copy — sits below the medal (~64% from top) -->
                 <div class="v3-idle-copy">
-                    <h1 class="v3-idle-serif">
+                    <h1 class="v3-idle-serif" data-i18n="idle.title">
                         How fast does <em>your signal</em> travel.
                     </h1>
-                    <p class="v3-idle-sub">Press to begin · Takes ~25s</p>
+                    <p class="v3-idle-sub" data-i18n="idle.subtitle">Press to begin · Takes ~25s</p>
                 </div>
 
                 <!-- START capsule — anchored to bottom -->
@@ -277,7 +278,7 @@
                         class="v3-capsule-primary"
                         aria-label="Start speed test"
                     >
-                        <span>START</span>
+                        <span data-i18n="btn.start">START</span>
                         <svg
                             viewBox="0 0 20 20"
                             fill="none"
@@ -300,13 +301,13 @@
                 <div class="v3-testing-pill-row">
                     <div class="v3-phase-pill">
                         <span class="v3-phase-seg step" data-step="ping"
-                            ><span class="ind"></span>Ping</span
+                            ><span class="ind"></span><span data-i18n="phase.ping">Ping</span></span
                         >
                         <span class="v3-phase-seg step" data-step="download"
-                            ><span class="ind"></span>Download</span
+                            ><span class="ind"></span><span data-i18n="phase.download">Download</span></span
                         >
                         <span class="v3-phase-seg step" data-step="upload"
-                            ><span class="ind"></span>Upload</span
+                            ><span class="ind"></span><span data-i18n="phase.upload">Upload</span></span
                         >
                     </div>
                 </div>
@@ -316,14 +317,14 @@
 
                 <!-- Center live readout (IDs preserved for app-v2.js) -->
                 <div class="v3-testing-center">
-                    <div class="v3-testing-caption" id="live-caption">
+                    <div class="v3-testing-caption" id="live-caption" data-i18n="phase.measuring">
                         MEASURING LATENCY
                     </div>
                     <div class="v3-testing-value-row">
                         <span id="live-value" class="v3-testing-number"
                             >0.00</span
                         >
-                        <span id="live-unit" class="v3-testing-unit">ms</span>
+                        <span id="live-unit" class="v3-testing-unit" data-i18n="unit.ms">ms</span>
                     </div>
                 </div>
 
@@ -331,27 +332,27 @@
                 <div class="v3-testing-bottom">
                     <div class="v3-testing-chips">
                         <div class="v3-metric-chip">
-                            <div class="label">PEAK</div>
+                            <div class="label" data-i18n="metric.peak">PEAK</div>
                             <div class="value-row">
                                 <span id="hud-peak" class="value">0.00</span>
-                                <span class="unit">Mbps</span>
+                                <span class="unit" data-i18n="unit.mbps">Mbps</span>
                             </div>
                         </div>
                         <div class="v3-metric-chip">
-                            <div class="label">AVG</div>
+                            <div class="label" data-i18n="metric.avg">AVG</div>
                             <div class="value-row">
                                 <span id="hud-avg" class="value">0.00</span>
-                                <span class="unit">Mbps</span>
+                                <span class="unit" data-i18n="unit.mbps">Mbps</span>
                             </div>
                         </div>
                         <div class="v3-metric-chip">
-                            <div class="label">ELAPSED</div>
+                            <div class="label" data-i18n="metric.elapsed">ELAPSED</div>
                             <div class="value-row">
                                 <span id="hud-elapsed" class="value">0.0s</span>
                             </div>
                         </div>
                     </div>
-                    <button id="btn-cancel" class="v3-capsule-secondary">
+                    <button id="btn-cancel" class="v3-capsule-secondary" data-i18n="btn.cancel">
                         Cancel
                     </button>
                 </div>
@@ -405,7 +406,7 @@
                     <div class="v3-grade-pill" id="grade-pill" data-grade="—">
                         <div class="badge" id="grade-letter">—</div>
                         <div class="v3-grade-pill-text">
-                            <div class="caption" id="grade-title">PENDING</div>
+                            <div class="caption" id="grade-title" data-i18n="grade.pending">PENDING</div>
                             <div class="v3-grade-sub" id="grade-desc"></div>
                         </div>
                     </div>
@@ -416,10 +417,10 @@
 
                 <!-- Top-left title — desktop/tablet only -->
                 <div class="v3-result-title">
-                    <div class="v3-result-eyebrow" id="result-date">
+                    <div class="v3-result-eyebrow" id="result-date" data-i18n="result.complete">
                         BENCHMARK COMPLETE
                     </div>
-                    <h2 class="v3-result-headline">
+                    <h2 class="v3-result-headline" data-i18n="result.headline">
                         Your connection,<br /><em>forged.</em>
                     </h2>
                 </div>
@@ -428,40 +429,40 @@
                 <!-- position set via CSS data-chip selectors -->
                 <div class="v3-chip-orbit">
                     <div class="v3-metric-chip v3-orbit-chip" data-chip="down">
-                        <div class="label">DOWNLOAD</div>
+                        <div class="label" data-i18n="result.download">DOWNLOAD</div>
                         <div class="value-row">
                             <span id="r-down" class="value">—</span>
-                            <span class="unit">Mbps</span>
+                            <span class="unit" data-i18n="unit.mbps">Mbps</span>
                         </div>
                     </div>
                     <div class="v3-metric-chip v3-orbit-chip" data-chip="up">
-                        <div class="label">UPLOAD</div>
+                        <div class="label" data-i18n="result.upload">UPLOAD</div>
                         <div class="value-row">
                             <span id="r-up" class="value">—</span>
-                            <span class="unit">Mbps</span>
+                            <span class="unit" data-i18n="unit.mbps">Mbps</span>
                         </div>
                     </div>
                     <div class="v3-metric-chip v3-orbit-chip" data-chip="ping">
-                        <div class="label">PING</div>
+                        <div class="label" data-i18n="result.ping">PING</div>
                         <div class="value-row">
                             <span id="r-ping" class="value">—</span>
-                            <span class="unit">ms</span>
+                            <span class="unit" data-i18n="unit.ms">ms</span>
                         </div>
                     </div>
                     <div
                         class="v3-metric-chip v3-orbit-chip"
                         data-chip="jitter"
                     >
-                        <div class="label">JITTER</div>
+                        <div class="label" data-i18n="result.jitter">JITTER</div>
                         <div class="value-row">
                             <span id="r-jitter" class="value">—</span>
-                            <span class="unit">ms</span>
+                            <span class="unit" data-i18n="unit.ms">ms</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Drag hint — bottom-right of medal area -->
-                <div class="v3-medal-hint" aria-hidden="true">
+                <div class="v3-medal-hint" aria-hidden="true" data-i18n="result.drag">
                     DRAG · SCROLL
                 </div>
 
@@ -469,36 +470,35 @@
                 <div class="v3-result-bottom">
                     <div class="v3-result-info">
                         <div class="v3-cap-strip">
-                            <span class="head">// CAPABILITY</span>
+                            <span class="head" data-i18n="result.capability">// CAPABILITY</span>
                             <span class="v3-cap-pill bench-row" data-min="3"
-                                ><span class="bench-check" hidden></span>HD
-                                Call</span
+                                ><span class="bench-check" hidden></span><span data-i18n="cap.hdCall">HD Call</span></span
                             >
                             <span class="v3-cap-pill bench-row" data-min="5"
                                 ><span class="bench-check" hidden></span
-                                >1080p</span
+                                ><span data-i18n="cap.1080p">1080p</span></span
                             >
                             <span class="v3-cap-pill bench-row" data-min="25"
-                                ><span class="bench-check" hidden></span>4K
-                                HDR</span
+                                ><span class="bench-check" hidden></span><span data-i18n="cap.4k">4K
+                                HDR</span></span
                             >
                             <span class="v3-cap-pill bench-row" data-min="50"
-                                ><span class="bench-check" hidden></span>Cloud
-                                Gaming</span
+                                ><span class="bench-check" hidden></span><span data-i18n="cap.gaming">Cloud
+                                Gaming</span></span
                             >
                             <span class="v3-cap-pill bench-row" data-min="100"
-                                ><span class="bench-check" hidden></span>8K
-                                Multi</span
+                                ><span class="bench-check" hidden></span><span data-i18n="cap.8k">8K
+                                Multi</span></span
                             >
                             <span class="v3-cap-pill bench-row" data-min="300"
-                                ><span class="bench-check" hidden></span>Pro ·
-                                VR</span
+                                ><span class="bench-check" hidden></span><span data-i18n="cap.pro">Pro ·
+                                VR</span></span
                             >
                         </div>
                         <p class="v3-disclaimer">
-                            <span class="tag">// NOTE</span>Measured to
+                            <span class="tag" data-i18n="result.note">// NOTE</span><span data-i18n="disclaimer">Measured to
                             Cloudflare global edge. Corporate firewalls may
-                            throttle upload to non-whitelisted endpoints.
+                            throttle upload to non-whitelisted endpoints.</span>
                         </p>
                     </div>
 
@@ -515,7 +515,7 @@
                                 <path d="M3.5 10a6.5 6.5 0 1 1 1.2 3.8" />
                                 <polyline points="3.5,14.5 3.5,10 7.5,10" />
                             </svg>
-                            <span>Run Again</span>
+                            <span data-i18n="btn.runAgain">Run Again</span>
                         </button>
                         <button
                             id="btn-share"
@@ -549,8 +549,8 @@
         <aside class="v3-drawer" id="history-drawer" aria-hidden="true">
             <div class="v3-drawer-head">
                 <div>
-                    <div class="v3-drawer-eyebrow">// HISTORY</div>
-                    <h3 class="v3-drawer-title">Test Runs</h3>
+                    <div class="v3-drawer-eyebrow" data-i18n="drawer.history">// HISTORY</div>
+                    <h3 class="v3-drawer-title" data-i18n="drawer.historyTitle">Test Runs</h3>
                 </div>
                 <button
                     class="v3-icon-btn"
@@ -576,8 +576,8 @@
         <aside class="v3-drawer" id="about-drawer" aria-hidden="true">
             <div class="v3-drawer-head">
                 <div>
-                    <div class="v3-drawer-eyebrow">// ABOUT</div>
-                    <h3 class="v3-drawer-title">Ultimate Speed Test</h3>
+                    <div class="v3-drawer-eyebrow" data-i18n="drawer.about">// ABOUT</div>
+                    <h3 class="v3-drawer-title" data-i18n="drawer.aboutTitle">Ultimate Speed Test</h3>
                 </div>
                 <button
                     class="v3-icon-btn"

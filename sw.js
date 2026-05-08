@@ -3,12 +3,13 @@
    - App shell (HTML/CSS/JS/icons/manifest): cache-first, refreshed in the background.
    - Everything else (including speed.cloudflare.com test traffic): network-only,
      so measurements are never served from cache. */
-const VERSION = "ust-v46-brand-icon";
+const VERSION = "ust-v47-i18n";
 const SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./app-v2.js",
+  "./i18n.js",
   "./shader-renderer.js",
   "./speedtest.js",
   "./medal.js",

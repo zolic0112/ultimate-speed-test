@@ -11,6 +11,54 @@ window.onload = init;
 function init() {
   const body = document.body;
 
+  // ── i18n initialization ─────────────────────────────────────────────────
+  const applyTranslations = () => {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      const html = I18N.get(key);
+      // For elements that might have inner elements (like <em>), we should be careful.
+      // If the element has children, only update the text nodes, otherwise replace all.
+      if (el.children.length === 0) {
+        el.textContent = html;
+      } else {
+        // Has children, try to preserve them but update text content where possible.
+        // For now, just set innerHTML if the translation has markup.
+        if (html.includes("<")) {
+          el.innerHTML = html;
+        } else {
+          el.textContent = html;
+        }
+      }
+    });
+  };
+
+  const setupLanguageSwitcher = () => {
+    const langs = I18N.getAll();
+    const langBtn = document.createElement("button");
+    langBtn.className = "v3-icon-btn";
+    langBtn.id = "nav-lang";
+    langBtn.setAttribute("aria-label", "Language");
+    langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${I18N.getLang().toUpperCase()}</span>`;
+
+    langBtn.addEventListener("click", () => {
+      const currentLang = I18N.getLang();
+      const langIndex = langs.indexOf(currentLang);
+      const nextIndex = (langIndex + 1) % langs.length;
+      const nextLang = langs[nextIndex];
+      I18N.setLang(nextLang);
+      langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${nextLang.toUpperCase()}</span>`;
+      applyTranslations();
+    });
+
+    const navContainer = document.querySelector(".v3-chrome.tr");
+    if (navContainer) {
+      navContainer.insertBefore(langBtn, navContainer.firstChild);
+    }
+  };
+
+  applyTranslations();
+  setupLanguageSwitcher();
+
   // ── Breakpoint detection ────────────────────────────────────────────────
   // Drives the v3 responsive layout via CSS [data-bp="mobile|tablet|desktop"].
   // Also feeds media-query-safe size variants without duplicating markup.
@@ -411,7 +459,9 @@ function init() {
 
       const { letter, title, desc } = gradeFor(results.download);
       $("grade-letter").textContent = letter;
-      $("grade-title").textContent = title;
+      // Translate grade title based on letter
+      const gradeKey = `grade.${letter.toLowerCase()}`;
+      $("grade-title").textContent = I18N.get(gradeKey);
       $("grade-desc").textContent = incomplete
         ? "Partial result · upload blocked"
         : desc;
