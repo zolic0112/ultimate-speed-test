@@ -43,7 +43,10 @@ function init() {
     langBtn.className = "v3-icon-btn";
     langBtn.id = "nav-lang";
     langBtn.setAttribute("aria-label", "Language");
-    langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${I18N.getLang().toUpperCase()}</span>`;
+    const labelFor = (lang) =>
+      // "zh-TW" → "ZH" so the chip stays one line on narrow phones.
+      lang.split("-")[0].toUpperCase();
+    langBtn.innerHTML = `<span style="font-size: 14px; font-weight: 500;">${labelFor(I18N.getLang())}</span>`;
 
     updateDocumentLang(I18N.getLang());
 
@@ -128,7 +131,15 @@ function init() {
   setBreakpoint();
   window.addEventListener("resize", setBreakpoint);
   // ---------- Shader background ----------
-  const dpr = Math.max(1, 0.5 * devicePixelRatio);
+  // Mobile fillrate is the bottleneck — drop the shader resolution further
+  // (0.4x vs 0.5x desktop) so the GPU isn't shading 3M+ fragments at 60 fps.
+  const isMobileDevice =
+    innerWidth < 768 ||
+    (matchMedia && matchMedia("(pointer: coarse)").matches);
+  const dpr = Math.max(
+    1,
+    (isMobileDevice ? 0.4 : 0.5) * devicePixelRatio,
+  );
   const canvas = document.getElementById("bg");
   const resize = () => {
     canvas.width = innerWidth * dpr;
@@ -137,7 +148,14 @@ function init() {
   };
   // .trim() is critical: the auto-formatter may indent the shader block,
   // and GLSL requires #version to be the very first token (no leading whitespace).
-  const source = document.getElementById("frag").textContent.trim();
+  let source = document.getElementById("frag").textContent.trim();
+  // Lightspeed inner loop runs 20 iterations per fragment. That's ~40M
+  // sin/cos calls per frame at 1080p — too much for mid-range phones.
+  // Halving it to 10 keeps the look near-identical (each iteration just
+  // adds one more dim particle) while doubling shader throughput.
+  if (isMobileDevice) {
+    source = source.replace("i++<20.", "i++<10.");
+  }
   const renderer = new ShaderRenderer(canvas, dpr);
   renderer.setup();
   renderer.init();

@@ -55,7 +55,10 @@ body {
     font-feature-settings: "ss01", "ss02", "tnum";
     -webkit-font-smoothing: antialiased;
     user-select: none;
-    touch-action: none;
+    /* `none` would disable mobile vertical scrolling on the result screen.
+       `pan-y` allows top-down scroll while still suppressing the browser's
+       native pinch-zoom (which we don't want for a fullscreen shader UI). */
+    touch-action: pan-y;
 }
 
 button {
@@ -1890,6 +1893,15 @@ body[data-bp="mobile"] .v3-chrome.tl {
 body[data-bp="mobile"] .v3-chrome.tr {
     top: calc(16px + env(safe-area-inset-top, 0px));
     right: calc(16px + env(safe-area-inset-right, 0px));
+    /* Three buttons (lang + history + about) get cramped on narrow phones. */
+    gap: 8px;
+}
+body[data-bp="mobile"] .v3-chrome.tr #nav-lang {
+    /* Language label needs to stay readable at 2-letter codes ("EN", "JA", "ES")
+       and the 5-char "ZH-TW". Force a single line so it doesn't break into rows. */
+    white-space: nowrap;
+    padding: 0 8px;
+    min-width: 0;
 }
 body[data-bp="mobile"] .v3-chrome .brand-name {
     display: none;
@@ -2040,8 +2052,12 @@ body[data-bp="mobile"] #screen-idle {
     align-items: center;
     justify-content: center;
     gap: 32px;
-    padding: 90px 24px 100px;
-    min-height: 100vh;
+    /* Add safe-area inset on top of base padding so iOS PWA standalone
+       (no browser chrome) doesn't push content under the status bar/home
+       indicator. */
+    padding: calc(90px + env(safe-area-inset-top, 0px)) 24px
+             calc(100px + env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
 }
 body[data-bp="mobile"] .v3-idle-copy {
     position: static !important;
@@ -2443,8 +2459,15 @@ html[data-lang="ja"] .v3-result-headline {
         justify-content: flex-start;
         pointer-events: auto !important;
         gap: 18px;
-        padding: 76px 16px 24px;
+        /* Top: room for the fixed top-right chrome (lang + history + about
+           buttons) plus iOS status bar/notch. Bottom: home indicator. */
+        padding: calc(76px + env(safe-area-inset-top, 0px)) 16px
+                 calc(24px + env(safe-area-inset-bottom, 0px));
         overflow-y: auto;
+        /* Allow vertical scroll on touch — overrides the pan-y on body and
+           enables momentum scrolling on iOS. */
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
     }
     /* Hide title + drag hint on mobile */
     .v3-result-title,
