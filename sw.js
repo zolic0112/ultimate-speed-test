@@ -1,9 +1,9 @@
 /* Ultimate Speed Test — service worker
    Strategy:
-   - App shell (HTML/CSS/JS/icons/manifest): cache-first, refreshed in the background.
-   - Everything else (including speed.cloudflare.com test traffic): network-only,
-     so measurements are never served from cache. */
-const VERSION = "ust-v49-share-modal-i18n";
+   - HTML / navigations: network-first (always show latest UI on refresh; cache fallback for offline).
+   - Other shell assets (CSS/JS/icons): stale-while-revalidate (instant load, refreshed in background).
+   - Cross-origin / speed test traffic: passthrough, never cached. */
+const VERSION = "ust-v50-network-first-html";
 const SHELL = [
   "./",
   "./index.html",
@@ -47,9 +47,32 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Never cache speed test traffic or cross-origin requests.
+  // Never cache cross-origin (incl. speed test traffic, fonts, CDNs).
   if (url.origin !== self.location.origin) return;
 
+  // Navigation / HTML requests → network-first.
+  // This avoids the "two refreshes to see updates" problem: each load
+  // hits the network for fresh markup, falls back to cache only when offline.
+  const isHTML =
+    req.mode === "navigate" ||
+    (req.headers.get("accept") || "").includes("text/html");
+
+  if (isHTML) {
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(VERSION).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html"))),
+    );
+    return;
+  }
+
+  // Other same-origin assets → stale-while-revalidate.
   e.respondWith(
     caches.match(req).then((hit) => {
       const fetchPromise = fetch(req)

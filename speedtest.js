@@ -42,10 +42,12 @@ class SpeedTest {
   //   3. Cloudflare __up      – default, may be CORS-blocked in some environments
   async _probeUploadEndpoint() {
     const candidates = [
-      // 1. Cloudflare Worker — runs on CF network, most accurate from anywhere
-      (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
-      // 2. Same-origin Netlify edge function — CORS-safe fallback (lower throughput)
+      // 1. Same-origin Pages Function (Cloudflare) / edge function (Netlify).
+      //    No CORS preflight, runs at the edge of whichever host serves the app.
       "/api/upload",
+      // 2. External Cloudflare Worker — fallback when same-origin endpoint
+      //    is unavailable (e.g. plain static host with no functions support).
+      (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
     ].filter(Boolean);
 
     for (const url of candidates) {
