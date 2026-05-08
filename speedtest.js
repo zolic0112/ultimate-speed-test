@@ -42,18 +42,25 @@ class SpeedTest {
   //   3. Cloudflare __up      – default, may be CORS-blocked in some environments
   async _probeUploadEndpoint() {
     const candidates = [
-      // 1. Same-origin Pages Function (Cloudflare) / edge function (Netlify).
-      //    No CORS preflight, runs at the edge of whichever host serves the app.
-      "/api/upload",
-      // 2. External Cloudflare Worker — fallback when same-origin endpoint
-      //    is unavailable (e.g. plain static host with no functions support).
+      // 1. Dedicated Cloudflare Worker — runs on CF network, optimized for
+      //    high-throughput streaming drain. Best raw upload performance.
       (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
+      // 2. Same-origin Pages Function / edge function — CORS-safe fallback.
+      //    Lower throughput than a dedicated Worker (Pages Functions have
+      //    tighter CPU/streaming limits) but always works on weak networks
+      //    where a cross-origin probe might time out.
+      "/api/upload",
     ].filter(Boolean);
+
+    // Generous probe timeout — mobile / weak networks can take >2s for the
+    // first cross-origin handshake (CORS preflight + TLS). Falling back
+    // prematurely caused the worker to be skipped on phones.
+    const PROBE_TIMEOUT = 5000;
 
     for (const url of candidates) {
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 2000);
+        const tid = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
         const res = await fetch(url, {
           method: "POST",
           body: new Blob([new Uint8Array(8)]), // 8-byte probe
