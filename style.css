@@ -2132,7 +2132,10 @@ body[data-bp="mobile"] #screen-idle .v3-capsule-primary {
     position: absolute;
     left: 0;
     right: 0;
-    top: 11%;
+    /* Push past the fixed top-right chrome (lang/history/about buttons)
+       and the iOS notch/status bar. 11% alone collides with the chrome
+       on tall narrow phones. */
+    top: calc(11% + env(safe-area-inset-top, 0px));
     display: flex;
     justify-content: center;
     z-index: 5;
@@ -2459,9 +2462,11 @@ html[data-lang="ja"] .v3-result-headline {
         justify-content: flex-start;
         pointer-events: auto !important;
         gap: 18px;
-        /* Top: room for the fixed top-right chrome (lang + history + about
-           buttons) plus iOS status bar/notch. Bottom: home indicator. */
-        padding: calc(76px + env(safe-area-inset-top, 0px)) 16px
+        /* Top: needs to clear the fixed chrome row (16px + 38px button + iOS
+           status bar) PLUS visual breathing room so the grade pill below
+           doesn't sit on the same horizontal line as the buttons.
+           Bottom: home indicator. */
+        padding: calc(108px + env(safe-area-inset-top, 0px)) 16px
                  calc(24px + env(safe-area-inset-bottom, 0px));
         overflow-y: auto;
         /* Allow vertical scroll on touch — overrides the pan-y on body and

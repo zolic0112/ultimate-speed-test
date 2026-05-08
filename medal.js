@@ -14,24 +14,16 @@
   class Medal {
     constructor(canvas) {
       this.canvas = canvas;
-      // Mobile detection — coarse pointer + narrow viewport. Used to dial
-      // back fillrate-heavy settings (pixelRatio, antialias) so phones
-      // can hold 60 fps with the lightspeed shader running underneath.
-      const isMobile =
-        innerWidth < 768 ||
-        (matchMedia && matchMedia("(pointer: coarse)").matches);
       this.renderer = new THREE.WebGLRenderer({
         canvas,
-        // Antialias adds ~30-50% fragment cost. On mobile the medal sits at
-        // 200-300px and the difference is barely visible; skip it.
-        antialias: !isMobile,
+        antialias: true,
         alpha: true,
       });
-      // Cap pixelRatio aggressively on mobile. devicePixelRatio is often 3
-      // on phones — rendering at 3x makes a 300px medal cost as much as a
-      // ~900px one. 1.5 keeps text readable without wrecking framerate.
-      const maxDPR = isMobile ? 1.5 : 2;
-      this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxDPR));
+      // Cap at 2 on all devices. Phones with DPR=3 end up rendering the
+      // 300px medal slot at 900px which is fillrate-bound; 2 still looks
+      // crisp and saves >2x on shading work. The shader background carries
+      // the bulk of the optimization on mobile (see app-v2.js).
+      this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       this.renderer.setSize(innerWidth, innerHeight, false);
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
