@@ -69,13 +69,17 @@ button {
     cursor: pointer;
 }
 
-/* Canvases stacked full-bleed */
+/* Canvases stacked full-bleed.
+   100dvh (not 100%) so the canvas extends past the iOS home indicator
+   in PWA standalone mode. Without this, height:100% only covers the
+   safe area and the home indicator strip stays as a black bar. */
 #bg,
 #medal-canvas {
     position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
     display: block;
 }
 #bg {
