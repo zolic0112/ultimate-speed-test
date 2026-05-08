@@ -142,8 +142,15 @@ function init() {
   );
   const canvas = document.getElementById("bg");
   const resize = () => {
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
+    // Use the canvas's own laid-out size (which respects the negative
+    // safe-area insets in CSS, see #bg in style.css) instead of innerWidth/
+    // innerHeight, so the GL buffer matches the physical pixels we're
+    // covering — no stretch into the home indicator strip.
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(rect.width, innerWidth);
+    const h = Math.max(rect.height, innerHeight);
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     if (renderer) renderer.updateScale(dpr);
   };
   // .trim() is critical: the auto-formatter may indent the shader block,

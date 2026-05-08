@@ -69,17 +69,21 @@ button {
     cursor: pointer;
 }
 
-/* Canvases stacked full-bleed.
-   100dvh (not 100%) so the canvas extends past the iOS home indicator
-   in PWA standalone mode. Without this, height:100% only covers the
-   safe area and the home indicator strip stays as a black bar. */
+/* Canvases stacked full-bleed past the iOS home indicator.
+   Using negative insets equal to safe-area-inset-* forces the canvas
+   to physically extend beyond the safe area on all four sides — more
+   reliable than relying on 100dvh, which on some iOS PWA builds still
+   stops at the safe-area boundary. In normal browsers env() is 0 so
+   the negatives collapse and nothing changes. */
 #bg,
 #medal-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100dvh;
+    top: calc(-1 * env(safe-area-inset-top, 0px));
+    left: calc(-1 * env(safe-area-inset-left, 0px));
+    right: calc(-1 * env(safe-area-inset-right, 0px));
+    bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+    width: auto;
+    height: auto;
     display: block;
 }
 #bg {
