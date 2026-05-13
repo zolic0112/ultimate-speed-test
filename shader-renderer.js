@@ -42,6 +42,14 @@ class ShaderRenderer {
     this.scale = scale;
     this.gl.viewport(0, 0, this.canvas.width * scale, this.canvas.height * scale);
   }
+  // When the canvas is larger than the visible viewport (e.g. bled past iOS
+  // home indicator), tell the shader to size its content to the VISIBLE area
+  // instead. Otherwise the shader's `min(R.x, R.y)` normalization sees the
+  // canvas as taller-than-wide and renders the tunnel stretched vertically.
+  setLogicalResolution(w, h) {
+    this.logicalW = w;
+    this.logicalH = h;
+  }
 
   updateShader(source) {
     this.reset();
@@ -116,7 +124,12 @@ class ShaderRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(program);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.uniform2f(program.resolution, canvas.width, canvas.height);
+    // Use logical (viewport-sized) resolution if set, otherwise fall back to
+    // the physical canvas size. Logical resolution makes the tunnel render
+    // proportionally to viewport even when canvas extends past it for bleed.
+    const rW = this.logicalW || canvas.width;
+    const rH = this.logicalH || canvas.height;
+    gl.uniform2f(program.resolution, rW, rH);
     gl.uniform1f(program.time, now * 1e-3);
     gl.uniform2f(program.touch, ...this.mouseCoords);
     gl.uniform1i(program.pointerCount, this.nbrOfPointers);

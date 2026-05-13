@@ -691,7 +691,6 @@
         const loaded = await this._loadModelForGrade(grade);
         if (!loaded) return; // keep procedural body
 
-        // Preserve the current visual rotation so the swap feels seamless
         const rx = this.body ? this.body.rotation.x : 0.15;
         const ry = this.body ? this.body.rotation.y : 0.5;
 
@@ -699,14 +698,48 @@
         this.body = loaded.clone(true);
         this.scene.add(this.body);
 
-        // Defer heavy layout calculations to idle time to avoid blocking
-        // the main thread when swapping models during result-screen transition.
-        // Use setTimeout 0 to defer until after the current event loop.
+        // CRITICAL: scale + center synchronously. Deferring caused the model
+        // to render at its native (huge, off-centre) size for a frame or two
+        // before the idle callback fired — looked broken on result screen.
+        const box = new THREE.Box3().setFromObject(this.body);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        this._baseScale = maxDim > 0.001 ? 2.4 / maxDim : 1;
+        this.body.scale.setScalar(this._baseScale);
+
+        const box2 = new THREE.Box3().setFromObject(this.body);
+        const center = box2.getCenter(new THREE.Vector3());
+        this._centerOffset.copy(center).negate();
+        this.body.position.copy(this._centerOffset);
+        this.body.rotation.set(rx, ry, 0);
+
+        // Defer non-critical work (env map application + back label) to idle
+        // since these don't affect initial visual correctness.
+        const finalize = () => {
+          if (!this.body) return;
+          this.body.traverse((child) => {
+            if (!child.isMesh) return;
+            const mats = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+            mats.forEach((m) => {
+              m.envMap = this.envMap;
+              m.envMapIntensity = 1.4;
+              m.needsUpdate = true;
+            });
+          });
+
+          const localDiam = Math.min(size.x, size.y) * 0.95;
+          const localBackZ = box.min.z - 0.05;
+          this._makeBackLabel(localDiam, localBackZ).then((mesh) => {
+            this.back = mesh;
+            if (this.body) this.body.add(this.back);
+          });
+        };
         if (typeof requestIdleCallback !== "undefined") {
-          requestIdleCallback(() => this._finalizeModelSwap(grade, rx, ry));
+          requestIdleCallback(finalize);
         } else {
-          // Fallback for browsers without requestIdleCallback
-          setTimeout(() => this._finalizeModelSwap(grade, rx, ry), 0);
+          setTimeout(finalize, 0);
         }
       } catch (err) {
         console.warn("[medal] _swapModel error:", err);
@@ -714,47 +747,6 @@
       } finally {
         this._swapping = false;
       }
-    }
-
-    // Finalize model swap: compute bounding boxes, scale, apply materials.
-    // Called on idle so layout calculations don't block the UI thread.
-    async _finalizeModelSwap(grade, rx, ry) {
-      if (!this.body) return;
-
-      // Auto-normalise: fit within a ~2.4-unit bounding sphere.
-      const box = new THREE.Box3().setFromObject(this.body);
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      this._baseScale = maxDim > 0.001 ? 2.4 / maxDim : 1;
-      this.body.scale.setScalar(this._baseScale);
-
-      // Centre the model.
-      const box2 = new THREE.Box3().setFromObject(this.body);
-      const center = box2.getCenter(new THREE.Vector3());
-      this._centerOffset.copy(center).negate();
-      this.body.position.copy(this._centerOffset);
-      this.body.rotation.set(rx, ry, 0);
-
-      // Apply env map to all meshes for correct PBR reflections
-      this.body.traverse((child) => {
-        if (!child.isMesh) return;
-        const mats = Array.isArray(child.material)
-          ? child.material
-          : [child.material];
-        mats.forEach((m) => {
-          m.envMap = this.envMap;
-          m.envMapIntensity = 1.4;
-          m.needsUpdate = true;
-        });
-      });
-
-      // ── Engrave back face ────────────────────────────────────────────
-      const localDiam = Math.min(size.x, size.y) * 0.95;
-      const localBackZ = box.min.z - 0.05;
-      this.back = await this._makeBackLabel(localDiam, localBackZ);
-      this.body.add(this.back);
-
-      console.log(`[medal] grade-${grade} finalized (scale=${this._baseScale.toFixed(4)})`);
     }
 
     // ============================= public API ==============================

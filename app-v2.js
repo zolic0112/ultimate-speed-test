@@ -233,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v67 PWA:${standalone ? "Y" : "N"} ` +
+      `v68 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -265,7 +265,12 @@ function init() {
       ) + BLEED;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
-    if (renderer) renderer.updateScale(dpr);
+    if (renderer) {
+      renderer.updateScale(dpr);
+      // Tell shader the visible viewport dims so the tunnel renders at the
+      // right aspect (not stretched by the extra bleed area).
+      renderer.setLogicalResolution(innerWidth * dpr, innerHeight * dpr);
+    }
   };
   // .trim() is critical: the auto-formatter may indent the shader block,
   // and GLSL requires #version to be the very first token (no leading whitespace).
