@@ -45,9 +45,11 @@ html,
 body {
     width: 100%;
     height: 100%;
-    /* Use dynamic viewport height where supported (iOS PWA, modern browsers).
-       Falls back to 100% when dvh is unsupported. */
-    min-height: 100dvh;
+    /* Use LARGE viewport (100lvh) so html/body span the full physical screen
+       including the iOS home-indicator strip. 100dvh shrinks under browser
+       chrome and excludes safe-area — that's exactly what we DON'T want
+       since #bg uses position:absolute relative to html. */
+    min-height: 100lvh;
     overflow: hidden;
     background: var(--bg);
     color: var(--fg);

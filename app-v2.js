@@ -181,36 +181,41 @@ function init() {
     const totalW = w + BLEED;
     const totalH = h + BLEED;
 
-    // Only stretch the background shader canvas. The medal floats in the
-    // centre and looks completely broken if we resize its WebGL viewport.
-    // (Three.js camera aspect = canvas.width/height, so stretching makes
-    // the model balloon and offset wrong.)
+    // Background shader canvas.
+    // iOS Safari clips `position: fixed` elements to the VISUAL viewport
+    // (innerHeight = 797 on iPhone 14, missing the 47px home-indicator strip
+    // even though screen.height = 844). Switching to `position: absolute`
+    // anchored to <html> (which spans the LAYOUT viewport including
+    // safe-area) is the only reliable escape from the clip.
     const c = canvas;
     c.style.setProperty("width", totalW + "px", "important");
     c.style.setProperty("height", totalH + "px", "important");
-    c.style.setProperty("position", "fixed", "important");
+    c.style.setProperty("position", "absolute", "important");
     c.style.setProperty("top", -BLEED / 2 + "px", "important");
     c.style.setProperty("left", -BLEED / 2 + "px", "important");
     c.style.setProperty("right", "auto", "important");
     c.style.setProperty("bottom", "auto", "important");
-    // Force compositing layer — sometimes lets canvas escape iOS PWA
-    // viewport clipping on the home indicator area.
+    // Force compositing layer so the canvas can render past viewport bounds.
     c.style.setProperty("transform", "translateZ(0)", "important");
     c.style.zIndex = "0";
 
-    // Medal canvas: stay viewport-sized so 3D model renders correctly.
-    // When non-inline (fullscreen overlay during testing), use innerWidth/
-    // Height so the Three.js camera aspect ratio is sensible.
+    // Medal canvas: DON'T set any inline styles. Let CSS fully control
+    // its size — fullscreen (100vw/vh) when overlay, 100% of slot when
+    // .inline. Setting inline-style !important earlier was sticking even
+    // after the medal moved into a slot, preventing CSS from re-sizing it
+    // and causing the 3D model to balloon on the result screen.
     const medalC = document.getElementById("medal-canvas");
-    if (medalC && !medalC.classList.contains("inline")) {
-      medalC.style.setProperty("width", innerWidth + "px", "important");
-      medalC.style.setProperty("height", innerHeight + "px", "important");
-      medalC.style.setProperty("position", "fixed", "important");
-      medalC.style.setProperty("top", "0", "important");
-      medalC.style.setProperty("left", "0", "important");
-      medalC.style.setProperty("right", "auto", "important");
-      medalC.style.setProperty("bottom", "auto", "important");
-      medalC.style.zIndex = "1";
+    if (medalC) {
+      // Clear any leftover inline styles from previous versions
+      [
+        "width",
+        "height",
+        "position",
+        "top",
+        "left",
+        "right",
+        "bottom",
+      ].forEach((p) => medalC.style.removeProperty(p));
     }
 
     // Visible debug overlay (top-left corner, tiny text).
@@ -228,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v66 PWA:${standalone ? "Y" : "N"} ` +
+      `v67 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
