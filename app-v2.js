@@ -141,14 +141,34 @@ function init() {
     (isMobileDevice ? 0.4 : 0.5) * devicePixelRatio,
   );
   const canvas = document.getElementById("bg");
+  // Force-extend the fullscreen canvases (bg shader + fullscreen medal) past
+  // every safe-area on iOS PWA standalone. CSS 100lvh / negative insets are
+  // unreliable across iOS versions; using screen.width/height (logical CSS
+  // pixels for the whole physical display) and inline-style is the one
+  // approach that consistently reaches the home indicator strip.
+  const forceFullBleed = () => {
+    const w = Math.max(screen.width, innerWidth);
+    const h = Math.max(screen.height, innerHeight);
+    [canvas, document.getElementById("medal-canvas")].forEach((c) => {
+      if (!c || c.classList.contains("inline")) return;
+      c.style.width = w + "px";
+      c.style.height = h + "px";
+      c.style.position = "fixed";
+      c.style.top = "0";
+      c.style.left = "0";
+    });
+  };
+  forceFullBleed();
+  window.addEventListener("resize", forceFullBleed);
+  window.addEventListener("orientationchange", () =>
+    setTimeout(forceFullBleed, 100),
+  );
+
   const resize = () => {
-    // Use the canvas's own laid-out size (which respects the negative
-    // safe-area insets in CSS, see #bg in style.css) instead of innerWidth/
-    // innerHeight, so the GL buffer matches the physical pixels we're
-    // covering — no stretch into the home indicator strip.
-    const rect = canvas.getBoundingClientRect();
-    const w = Math.max(rect.width, innerWidth);
-    const h = Math.max(rect.height, innerHeight);
+    forceFullBleed();
+    // GL buffer size matches the inline-styled CSS pixels (with dpr).
+    const w = Math.max(screen.width, innerWidth);
+    const h = Math.max(screen.height, innerHeight);
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     if (renderer) renderer.updateScale(dpr);
