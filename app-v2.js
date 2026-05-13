@@ -161,24 +161,58 @@ function init() {
   // canvas physically covers any conceivable safe-area combination.
   // (The extra pixels are off-screen for normal layouts, GPU shades a tiny
   // bit extra but it's negligible compared to seeing a black bar.)
-  const BLEED = 200; // Increased bleed to guarantee coverage of home indicator
+  const BLEED = 400; // 400px bleed: enough to cover home indicator on any iOS
   const forceFullBleed = () => {
-    // Use screen dimensions as primary source (more reliable on iOS PWA)
-    // Only fall back to innerWidth if screen.width is 0 or undefined
-    const w = screen.width || innerWidth;
-    const h = screen.height || innerHeight;
+    // Use the LARGEST of all available dimension sources, since each one
+    // can under-report in different iOS PWA situations:
+    //   screen.{w,h}          → physical pixels (usually largest)
+    //   innerWidth/Height     → CSS pixels of viewport (excludes safe-area on iOS)
+    //   documentElement       → may match either
+    const w = Math.max(
+      screen.width || 0,
+      innerWidth || 0,
+      document.documentElement.clientWidth || 0,
+    );
+    const h = Math.max(
+      screen.height || 0,
+      innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+    );
     const totalW = w + BLEED;
     const totalH = h + BLEED;
 
     [canvas, document.getElementById("medal-canvas")].forEach((c) => {
       if (!c || c.classList.contains("inline")) return;
-      c.style.width = totalW + "px";
-      c.style.height = totalH + "px";
-      c.style.position = "fixed";
-      c.style.top = -BLEED / 2 + "px";
-      c.style.left = -BLEED / 2 + "px";
+      // !important via setProperty so nothing can override
+      c.style.setProperty("width", totalW + "px", "important");
+      c.style.setProperty("height", totalH + "px", "important");
+      c.style.setProperty("position", "fixed", "important");
+      c.style.setProperty("top", -BLEED / 2 + "px", "important");
+      c.style.setProperty("left", -BLEED / 2 + "px", "important");
+      c.style.setProperty("right", "auto", "important");
+      c.style.setProperty("bottom", "auto", "important");
       c.style.zIndex = c === canvas ? "0" : "1";
     });
+
+    // Visible debug overlay (top-left corner, tiny text).
+    // Tap to dismiss. Helps diagnose what dimensions are actually used.
+    let dbg = document.getElementById("layout-dbg");
+    if (!dbg) {
+      dbg = document.createElement("div");
+      dbg.id = "layout-dbg";
+      dbg.style.cssText =
+        "position:fixed;top:env(safe-area-inset-top,0);left:0;z-index:9999;background:rgba(0,0,0,.7);color:#0f0;font:9px/1.2 monospace;padding:3px 5px;pointer-events:auto;max-width:60vw;border-bottom-right-radius:4px";
+      dbg.addEventListener("click", () => dbg.remove());
+      document.body.appendChild(dbg);
+    }
+    const standalone =
+      navigator.standalone ||
+      window.matchMedia("(display-mode: standalone)").matches;
+    dbg.textContent =
+      `v65 PWA:${standalone ? "Y" : "N"} ` +
+      `scr:${screen.width}×${screen.height} ` +
+      `inr:${innerWidth}×${innerHeight} ` +
+      `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
 
     console.log(
       `[layout] screen: ${w}×${h}, canvas: ${totalW}×${totalH}, offset: -${BLEED / 2}px`,
@@ -193,8 +227,18 @@ function init() {
   const resize = () => {
     forceFullBleed();
     // GL buffer size matches the inline-styled CSS pixels (with dpr).
-    const w = (screen.width || innerWidth) + BLEED;
-    const h = (screen.height || innerHeight) + BLEED;
+    const w =
+      Math.max(
+        screen.width || 0,
+        innerWidth || 0,
+        document.documentElement.clientWidth || 0,
+      ) + BLEED;
+    const h =
+      Math.max(
+        screen.height || 0,
+        innerHeight || 0,
+        document.documentElement.clientHeight || 0,
+      ) + BLEED;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     if (renderer) renderer.updateScale(dpr);
