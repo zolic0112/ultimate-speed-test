@@ -15,6 +15,23 @@ class ShaderRenderer {
     this.pointerCoords = [0, 0];
     this.nbrOfPointers = 0;
     this.extraProvider = null;
+    this.contextLost = false;
+
+    // WebGL context can be lost when iOS Safari moves the app to the
+    // background under memory pressure. Without this handler the shader
+    // simply stops rendering forever and you get a black screen on return.
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();  // signal to the browser that we want to restore
+      this.contextLost = true;
+      console.warn('[shader] WebGL context lost');
+    }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.log('[shader] WebGL context restored');
+      this.contextLost = false;
+      // Rebuild program + buffers from scratch using last-known shader.
+      this.setup();
+      this.init();
+    }, false);
   }
 
   setExtraUniformProvider(fn) { this.extraProvider = fn; }
@@ -93,6 +110,7 @@ class ShaderRenderer {
 
   render(now = 0) {
     const { gl, program, buffer, canvas } = this;
+    if (this.contextLost) return;  // skip frames while context is restoring
     if (!program || gl.getProgramParameter(program, gl.DELETE_STATUS)) return;
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);

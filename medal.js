@@ -27,6 +27,28 @@
       this.renderer.setSize(innerWidth, innerHeight, false);
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+      // ── WebGL context loss recovery ─────────────────────────────────
+      // iOS Safari occasionally drops the GL context (backgrounding, memory
+      // pressure). Without this handler the medal just disappears for the
+      // rest of the session.
+      this.contextLost = false;
+      canvas.addEventListener("webglcontextlost", (e) => {
+        e.preventDefault();
+        this.contextLost = true;
+        console.warn("[medal] WebGL context lost");
+      }, false);
+      canvas.addEventListener("webglcontextrestored", () => {
+        console.log("[medal] WebGL context restored");
+        this.contextLost = false;
+        // Force-rebuild the current grade's model after restoration.
+        // The cached glTF data (already in JS memory from preload) is
+        // re-uploaded to the new GL context via _swapModel.
+        const currentGrade = this.grade;
+        if (currentGrade && this._swapModel) {
+          this._swapModel(currentGrade).catch(() => {});
+        }
+      }, false);
+
       this.scene = new THREE.Scene();
       this.camera = new THREE.PerspectiveCamera(
         32,
@@ -862,6 +884,13 @@
 
     // ================================================================ loop
     _loop(t) {
+      // Skip rendering while context is lost — Three.js would throw on a
+      // dead WebGL context. Keep the rAF chain alive so we resume cleanly
+      // once webglcontextrestored fires.
+      if (this.contextLost) {
+        requestAnimationFrame(this._loop);
+        return;
+      }
       // ── Testing phase opacity fade ──────────────────────────────────
       // When testing, the medal gradually becomes more visible (fades from
       // transparent to fully solid) over ~2-3 seconds.

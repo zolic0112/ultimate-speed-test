@@ -279,6 +279,20 @@ function init() {
     console.warn("[medal]", e);
   }
 
+  // ── Preload all grade medals upfront ────────────────────────────────────
+  // Each glb is 4-7 MB. Previously we only preloaded the predicted grade
+  // mid-test (~10s window), which often wasn't enough on slower networks —
+  // result screen would show the empty placeholder instead of the medal.
+  // Loading all 6 in parallel during the idle screen guarantees the right
+  // model is already in memory when the test finishes, regardless of grade.
+  // Stagger the start slightly so the medal canvas itself can render its
+  // first frame without GPU/network contention.
+  if (medal && typeof medal.preloadModel === "function") {
+    setTimeout(() => {
+      ["S", "A", "B", "C", "D", "F"].forEach((g) => medal.preloadModel(g));
+    }, 300);
+  }
+
   // ---------- Screens ----------
   const screens = {
     idle: document.getElementById("screen-idle"),
