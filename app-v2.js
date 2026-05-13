@@ -181,18 +181,37 @@ function init() {
     const totalW = w + BLEED;
     const totalH = h + BLEED;
 
-    [canvas, document.getElementById("medal-canvas")].forEach((c) => {
-      if (!c || c.classList.contains("inline")) return;
-      // !important via setProperty so nothing can override
-      c.style.setProperty("width", totalW + "px", "important");
-      c.style.setProperty("height", totalH + "px", "important");
-      c.style.setProperty("position", "fixed", "important");
-      c.style.setProperty("top", -BLEED / 2 + "px", "important");
-      c.style.setProperty("left", -BLEED / 2 + "px", "important");
-      c.style.setProperty("right", "auto", "important");
-      c.style.setProperty("bottom", "auto", "important");
-      c.style.zIndex = c === canvas ? "0" : "1";
-    });
+    // Only stretch the background shader canvas. The medal floats in the
+    // centre and looks completely broken if we resize its WebGL viewport.
+    // (Three.js camera aspect = canvas.width/height, so stretching makes
+    // the model balloon and offset wrong.)
+    const c = canvas;
+    c.style.setProperty("width", totalW + "px", "important");
+    c.style.setProperty("height", totalH + "px", "important");
+    c.style.setProperty("position", "fixed", "important");
+    c.style.setProperty("top", -BLEED / 2 + "px", "important");
+    c.style.setProperty("left", -BLEED / 2 + "px", "important");
+    c.style.setProperty("right", "auto", "important");
+    c.style.setProperty("bottom", "auto", "important");
+    // Force compositing layer — sometimes lets canvas escape iOS PWA
+    // viewport clipping on the home indicator area.
+    c.style.setProperty("transform", "translateZ(0)", "important");
+    c.style.zIndex = "0";
+
+    // Medal canvas: stay viewport-sized so 3D model renders correctly.
+    // When non-inline (fullscreen overlay during testing), use innerWidth/
+    // Height so the Three.js camera aspect ratio is sensible.
+    const medalC = document.getElementById("medal-canvas");
+    if (medalC && !medalC.classList.contains("inline")) {
+      medalC.style.setProperty("width", innerWidth + "px", "important");
+      medalC.style.setProperty("height", innerHeight + "px", "important");
+      medalC.style.setProperty("position", "fixed", "important");
+      medalC.style.setProperty("top", "0", "important");
+      medalC.style.setProperty("left", "0", "important");
+      medalC.style.setProperty("right", "auto", "important");
+      medalC.style.setProperty("bottom", "auto", "important");
+      medalC.style.zIndex = "1";
+    }
 
     // Visible debug overlay (top-left corner, tiny text).
     // Tap to dismiss. Helps diagnose what dimensions are actually used.
@@ -209,7 +228,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v65 PWA:${standalone ? "Y" : "N"} ` +
+      `v66 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
