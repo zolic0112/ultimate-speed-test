@@ -233,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v68 PWA:${standalone ? "Y" : "N"} ` +
+      `v69 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -267,9 +267,10 @@ function init() {
     canvas.height = h * dpr;
     if (renderer) {
       renderer.updateScale(dpr);
-      // Tell shader the visible viewport dims so the tunnel renders at the
-      // right aspect (not stretched by the extra bleed area).
-      renderer.setLogicalResolution(innerWidth * dpr, innerHeight * dpr);
+      // Tell shader the viewport-relative scale so the tunnel stays the same
+      // size as before we bled the canvas past the home indicator.
+      // (R uniform stays = canvas dims so the center remains at viewport center.)
+      renderer.setRenderScale(Math.min(innerWidth, innerHeight) * dpr);
     }
   };
   // .trim() is critical: the auto-formatter may indent the shader block,

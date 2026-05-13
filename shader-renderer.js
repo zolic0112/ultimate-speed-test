@@ -43,12 +43,12 @@ class ShaderRenderer {
     this.gl.viewport(0, 0, this.canvas.width * scale, this.canvas.height * scale);
   }
   // When the canvas is larger than the visible viewport (e.g. bled past iOS
-  // home indicator), tell the shader to size its content to the VISIBLE area
-  // instead. Otherwise the shader's `min(R.x, R.y)` normalization sees the
-  // canvas as taller-than-wide and renders the tunnel stretched vertically.
-  setLogicalResolution(w, h) {
-    this.logicalW = w;
-    this.logicalH = h;
+  // home indicator), pass the SCALE (= min(viewport.x, viewport.y)) so the
+  // shader's tunnel size stays proportional to the visible viewport.
+  // R (resolution uniform) is kept = canvas dimensions so .5*R = canvas
+  // center = visual viewport center, keeping the tunnel centred.
+  setRenderScale(scale) {
+    this.renderScalePx = scale;
   }
 
   updateShader(source) {
@@ -108,6 +108,7 @@ class ShaderRenderer {
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     program.resolution = gl.getUniformLocation(program, 'resolution');
+    program.renderScale = gl.getUniformLocation(program, 'renderScale');
     program.time = gl.getUniformLocation(program, 'time');
     program.touch = gl.getUniformLocation(program, 'touch');
     program.pointerCount = gl.getUniformLocation(program, 'pointerCount');
@@ -124,12 +125,13 @@ class ShaderRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(program);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    // Use logical (viewport-sized) resolution if set, otherwise fall back to
-    // the physical canvas size. Logical resolution makes the tunnel render
-    // proportionally to viewport even when canvas extends past it for bleed.
-    const rW = this.logicalW || canvas.width;
-    const rH = this.logicalH || canvas.height;
-    gl.uniform2f(program.resolution, rW, rH);
+    // R = canvas dimensions: .5*R is canvas center, which our CSS positions
+    // at viewport center via negative top/left offset — so the tunnel sits
+    // visually centered.
+    gl.uniform2f(program.resolution, canvas.width, canvas.height);
+    // renderScale = min(viewport) so the tunnel stays viewport-sized rather
+    // than shrinking down because the canvas was made bigger for bleed.
+    gl.uniform1f(program.renderScale, this.renderScalePx || 0);
     gl.uniform1f(program.time, now * 1e-3);
     gl.uniform2f(program.touch, ...this.mouseCoords);
     gl.uniform1i(program.pointerCount, this.nbrOfPointers);

@@ -44,7 +44,8 @@
             precision highp float;
             out vec4 O;
             uniform float time;
-            uniform vec2 resolution;
+            uniform vec2 resolution;        // canvas pixel dimensions (centers content)
+            uniform float renderScale;      // logical scale = min(viewport.x, viewport.y); 0 falls back to min(R)
             uniform float speed;
             uniform float phase;       // continuous 0..2
             uniform float burst;       // 0..1 single-shot intensity for flash+ring
@@ -131,7 +132,12 @@
             }
 
             void main(void){
-              vec2 uv = (FC - .5*R) / min(R.x, R.y);
+              // Use renderScale for size (viewport-based) so the tunnel doesn't
+              // shrink when the canvas is bled past the home-indicator strip.
+              // .5*R keeps the center at canvas center, which is positioned at
+              // viewport center via CSS top/left offset.
+              float s = renderScale > 0.0 ? renderScale : min(R.x, R.y);
+              vec2 uv = (FC - .5*R) / s;
               float b = length(uv);
 
               // Phase mixing weights (smooth).
@@ -178,7 +184,8 @@
               }
 
               // Global vignette (stronger in ember phase, softer in lightspeed)
-              float vig = smoothstep(1.35, 0.25, length((FC - .5*R) / R.y));
+              // Use renderScale so vignette radius matches viewport, not bled canvas.
+              float vig = smoothstep(1.35, 0.25, length((FC - .5*R) / s));
               float vigMul = mix(0.55, 0.35, wEmber);
               col *= (1.0 - vigMul) + vigMul * vig;
 
