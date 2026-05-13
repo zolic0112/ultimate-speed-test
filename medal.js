@@ -19,11 +19,13 @@
         antialias: true,
         alpha: true,
       });
-      // Cap at 2 on all devices. Phones with DPR=3 end up rendering the
-      // 300px medal slot at 900px which is fillrate-bound; 2 still looks
-      // crisp and saves >2x on shading work. The shader background carries
-      // the bulk of the optimization on mobile (see app-v2.js).
-      this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      // On mobile: cap at 1.3 to reduce fillrate. Medal is only 260×260 inline,
+      // so 1.3 DPR (338×338) is still crisp while saving ~3x on shading work
+      // compared to DPR=3 (780×780). On desktop/tablet: keep up to 2.
+      const isMobile =
+        innerWidth < 768 || (matchMedia && matchMedia("(pointer: coarse)").matches);
+      const maxDpr = isMobile ? 1.3 : 2;
+      this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxDpr));
       this.renderer.setSize(innerWidth, innerHeight, false);
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -697,59 +699,62 @@
         this.body = loaded.clone(true);
         this.scene.add(this.body);
 
-        // Auto-normalise: fit within a ~2.4-unit bounding sphere so the glb
-        // matches the procedural puck's footprint regardless of source scale.
-        // Measure BEFORE applying scale so maxDim is in source units.
-        const box = new THREE.Box3().setFromObject(this.body);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        this._baseScale = maxDim > 0.001 ? 2.4 / maxDim : 1;
-        this.body.scale.setScalar(this._baseScale);
-
-        // Centre the model (after scaling). Offset is in world units so the
-        // float animation adds to it correctly each frame.
-        const box2 = new THREE.Box3().setFromObject(this.body);
-        const center = box2.getCenter(new THREE.Vector3());
-        this._centerOffset.copy(center).negate();
-        this.body.position.copy(this._centerOffset);
-        this.body.rotation.set(rx, ry, 0);
-
-        console.log(
-          `[medal] grade-${grade} source maxDim=${maxDim.toFixed(3)}, applied scale=${this._baseScale.toFixed(4)}`,
-        );
-
-        // Apply the scene's env map to every mesh for correct PBR reflections
-        this.body.traverse((child) => {
-          if (!child.isMesh) return;
-          const mats = Array.isArray(child.material)
-            ? child.material
-            : [child.material];
-          mats.forEach((m) => {
-            m.envMap = this.envMap;
-            m.envMapIntensity = 1.4;
-            m.needsUpdate = true;
-          });
-        });
-
-        // ── Engrave back face ────────────────────────────────────────────
-        // box was computed before scaling, so box.min.z is the back face in
-        // local (pre-scale) coordinates. Place the label plane there with a
-        // tiny offset so it sits just behind the geometry and never z-fights.
-        // planeSize = model's local diameter × 0.95 (fills the face but the
-        // transparent corners keep it looking circular).
-        const localDiam = Math.min(size.x, size.y) * 0.95;
-        const localBackZ = box.min.z - 0.05;
-        this.back = await this._makeBackLabel(localDiam, localBackZ);
-        this.body.add(this.back);
-
-        console.log(`[medal] swapped to external model for grade-${grade}`);
+        // Defer heavy layout calculations to idle time to avoid blocking
+        // the main thread when swapping models during result-screen transition.
+        // Use setTimeout 0 to defer until after the current event loop.
+        if (typeof requestIdleCallback !== "undefined") {
+          requestIdleCallback(() => this._finalizeModelSwap(grade, rx, ry));
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(() => this._finalizeModelSwap(grade, rx, ry), 0);
+        }
       } catch (err) {
         console.warn("[medal] _swapModel error:", err);
-        // Restore procedural medal on unexpected error
         this._buildMedal();
       } finally {
         this._swapping = false;
       }
+    }
+
+    // Finalize model swap: compute bounding boxes, scale, apply materials.
+    // Called on idle so layout calculations don't block the UI thread.
+    async _finalizeModelSwap(grade, rx, ry) {
+      if (!this.body) return;
+
+      // Auto-normalise: fit within a ~2.4-unit bounding sphere.
+      const box = new THREE.Box3().setFromObject(this.body);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      this._baseScale = maxDim > 0.001 ? 2.4 / maxDim : 1;
+      this.body.scale.setScalar(this._baseScale);
+
+      // Centre the model.
+      const box2 = new THREE.Box3().setFromObject(this.body);
+      const center = box2.getCenter(new THREE.Vector3());
+      this._centerOffset.copy(center).negate();
+      this.body.position.copy(this._centerOffset);
+      this.body.rotation.set(rx, ry, 0);
+
+      // Apply env map to all meshes for correct PBR reflections
+      this.body.traverse((child) => {
+        if (!child.isMesh) return;
+        const mats = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
+        mats.forEach((m) => {
+          m.envMap = this.envMap;
+          m.envMapIntensity = 1.4;
+          m.needsUpdate = true;
+        });
+      });
+
+      // ── Engrave back face ────────────────────────────────────────────
+      const localDiam = Math.min(size.x, size.y) * 0.95;
+      const localBackZ = box.min.z - 0.05;
+      this.back = await this._makeBackLabel(localDiam, localBackZ);
+      this.body.add(this.back);
+
+      console.log(`[medal] grade-${grade} finalized (scale=${this._baseScale.toFixed(4)})`);
     }
 
     // ============================= public API ==============================

@@ -2633,12 +2633,15 @@ body[data-bp="mobile"] #screen-result {
     display: flex !important;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* vertically centre the stack */
+    justify-content: flex-start; /* align to top, let content flow down */
     pointer-events: auto !important;
     gap: 16px;
-    padding: 76px 16px 24px;
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
     overflow-y: auto;
-    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    height: 100vh;
+    height: 100dvh;
 }
 /* On mobile result the medal is moved INLINE (see #medal-canvas.inline above);
    no dim-as-background hack is needed because the canvas no longer fills the screen. */

@@ -9,6 +9,20 @@
 window.onload = init;
 
 function init() {
+  // ── PWA Diagnostics ────────────────────────────────────────────────────
+  // Log installation status to help debug PWA mode issues.
+  const isStandalone = navigator.standalone === true;
+  const hasDisplay = window.matchMedia("(display-mode: standalone)").matches;
+  console.log(`[PWA] standalone: ${isStandalone}, display-mode: ${hasDisplay ? "standalone" : "browser"}`);
+  console.log(`[PWA] viewport: ${window.innerWidth}×${window.innerHeight}, dpr: ${devicePixelRatio}`);
+  console.log(`[PWA] screen: ${screen.width}×${screen.height}`);
+  if (typeof navigator.serviceWorker !== "undefined") {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      console.log(`[PWA] service workers: ${regs.length} registered`);
+      regs.forEach((r) => console.log(`  - scope: ${r.scope}`));
+    });
+  }
+
   const body = document.body;
 
   // ── i18n initialization ─────────────────────────────────────────────────
@@ -147,18 +161,28 @@ function init() {
   // canvas physically covers any conceivable safe-area combination.
   // (The extra pixels are off-screen for normal layouts, GPU shades a tiny
   // bit extra but it's negligible compared to seeing a black bar.)
-  const BLEED = 120;
+  const BLEED = 200; // Increased bleed to guarantee coverage of home indicator
   const forceFullBleed = () => {
-    const w = Math.max(screen.width, innerWidth);
-    const h = Math.max(screen.height, innerHeight);
+    // Use screen dimensions as primary source (more reliable on iOS PWA)
+    // Only fall back to innerWidth if screen.width is 0 or undefined
+    const w = screen.width || innerWidth;
+    const h = screen.height || innerHeight;
+    const totalW = w + BLEED;
+    const totalH = h + BLEED;
+
     [canvas, document.getElementById("medal-canvas")].forEach((c) => {
       if (!c || c.classList.contains("inline")) return;
-      c.style.width = w + BLEED + "px";
-      c.style.height = h + BLEED + "px";
+      c.style.width = totalW + "px";
+      c.style.height = totalH + "px";
       c.style.position = "fixed";
       c.style.top = -BLEED / 2 + "px";
       c.style.left = -BLEED / 2 + "px";
+      c.style.zIndex = c === canvas ? "0" : "1";
     });
+
+    console.log(
+      `[layout] screen: ${w}×${h}, canvas: ${totalW}×${totalH}, offset: -${BLEED / 2}px`,
+    );
   };
   forceFullBleed();
   window.addEventListener("resize", forceFullBleed);
@@ -169,8 +193,8 @@ function init() {
   const resize = () => {
     forceFullBleed();
     // GL buffer size matches the inline-styled CSS pixels (with dpr).
-    const w = Math.max(screen.width, innerWidth) + BLEED;
-    const h = Math.max(screen.height, innerHeight) + BLEED;
+    const w = (screen.width || innerWidth) + BLEED;
+    const h = (screen.height || innerHeight) + BLEED;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     if (renderer) renderer.updateScale(dpr);
@@ -180,10 +204,10 @@ function init() {
   let source = document.getElementById("frag").textContent.trim();
   // Lightspeed inner loop runs 20 iterations per fragment. That's ~40M
   // sin/cos calls per frame at 1080p — too much for mid-range phones.
-  // Halving it to 10 keeps the look near-identical (each iteration just
-  // adds one more dim particle) while doubling shader throughput.
+  // Reduce to 7 on mobile: still gives the lightspeed feel, but trades a bit
+  // of particle density for smooth 60fps during testing.
   if (isMobileDevice) {
-    source = source.replace("i++<20.", "i++<10.");
+    source = source.replace("i++<20.", "i++<7.");
   }
   const renderer = new ShaderRenderer(canvas, dpr);
   renderer.setup();
@@ -204,9 +228,15 @@ function init() {
   }
   window.onresize = resize;
 
-  // ---------- Pointer tracking ----------
+  // ---------- Pointer tracking (throttled) ----------
   const pointerState = { x: 0, y: 0, count: 1 };
+  let lastPointerUpdate = 0;
+  const POINTER_THROTTLE_MS = 16; // Update at most once per frame (60 fps)
   window.addEventListener("pointermove", (e) => {
+    const now = performance.now();
+    if (now - lastPointerUpdate < POINTER_THROTTLE_MS) return;
+    lastPointerUpdate = now;
+
     const x = (e.clientX / innerWidth) * 2 - 1;
     const y = 1 - (e.clientY / innerHeight) * 2;
     pointerState.x = x;
@@ -281,18 +311,19 @@ function init() {
     console.warn("[medal]", e);
   }
 
-  // ── Preload all grade medals upfront ────────────────────────────────────
-  // Each glb is 4-7 MB. Previously we only preloaded the predicted grade
-  // mid-test (~10s window), which often wasn't enough on slower networks —
-  // result screen would show the empty placeholder instead of the medal.
-  // Loading all 6 in parallel during the idle screen guarantees the right
-  // model is already in memory when the test finishes, regardless of grade.
-  // Stagger the start slightly so the medal canvas itself can render its
-  // first frame without GPU/network contention.
+  // ── Preload common grade medals with staggering ────────────────────────
+  // Loading all 6 models in parallel (24-42 MB) caused performance lag on mobile.
+  // Instead: load only A/B/C (covers ~90% of real-world speeds) with delays
+  // to spread CPU/network work and prevent main-thread blocking.
   if (medal && typeof medal.preloadModel === "function") {
-    setTimeout(() => {
-      ["S", "A", "B", "C", "D", "F"].forEach((g) => medal.preloadModel(g));
-    }, 300);
+    // Stagger loads: first grade starts at 500ms, then each +800ms apart
+    // This spreads decoding work across multiple animation frames
+    const grades = ["A", "B", "C"];
+    let delay = 500;
+    grades.forEach((g) => {
+      setTimeout(() => medal.preloadModel(g), delay);
+      delay += 800;
+    });
   }
 
   // ---------- Screens ----------

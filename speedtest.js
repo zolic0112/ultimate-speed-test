@@ -40,8 +40,8 @@ class SpeedTest {
   // First one that responds 200 wins; last resort is Cloudflare.
   //
   // Priority:
-  //   1. /api/upload          – local Netlify edge function (same-origin, no CORS)
-  //   2. window.UPLOAD_PROXY_URL – absolute Netlify URL (for Viverse / other hosts)
+  //   1. /api/upload          – local Cloudflare Pages Function (same-origin, no CORS)
+  //   2. window.UPLOAD_PROXY_URL – absolute URL (for Viverse / other hosts)
   //   3. Cloudflare __up      – default, may be CORS-blocked in some environments
   async _probeUploadEndpoint() {
     const candidates = [
@@ -53,15 +53,13 @@ class SpeedTest {
       (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
     ].filter(Boolean);
 
-    // Generous probe timeout — mobile / weak networks can take >2s for the
-    // first cross-origin handshake (CORS preflight + TLS). Falling back
-    // prematurely caused the worker to be skipped on phones.
-    const PROBE_TIMEOUT = 5000;
+    const PROBE_TIMEOUT = 5000; // 5s for CORS preflight + TLS on slow mobile
 
     for (const url of candidates) {
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
+        const t0 = performance.now();
         const res = await fetch(url, {
           method: "POST",
           body: new Blob([new Uint8Array(8)]), // 8-byte probe
@@ -69,13 +67,22 @@ class SpeedTest {
           signal: ctrl.signal,
         });
         clearTimeout(tid);
+        const probeMs = Math.round(performance.now() - t0);
         if (res.ok) {
           this.UP_URL = url;
-          this.log(`Upload endpoint → ${url}`);
+          this.log(`Upload endpoint → ${url} (probe: ${probeMs}ms)`);
           return;
+        } else {
+          this.log(
+            `Upload endpoint ${url} rejected: HTTP ${res.status} (probe: ${probeMs}ms)`,
+          );
         }
-      } catch {
-        /* timeout or network error — try next candidate */
+      } catch (e) {
+        const err =
+          e.name === "AbortError"
+            ? "timeout"
+            : e.message || "network error";
+        this.log(`Upload endpoint ${url} failed: ${err}`);
       }
     }
     this.log("Upload endpoint → Cloudflare __up (default)");
