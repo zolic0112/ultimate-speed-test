@@ -141,21 +141,23 @@ function init() {
     (isMobileDevice ? 0.4 : 0.5) * devicePixelRatio,
   );
   const canvas = document.getElementById("bg");
-  // Force-extend the fullscreen canvases (bg shader + fullscreen medal) past
-  // every safe-area on iOS PWA standalone. CSS 100lvh / negative insets are
-  // unreliable across iOS versions; using screen.width/height (logical CSS
-  // pixels for the whole physical display) and inline-style is the one
-  // approach that consistently reaches the home indicator strip.
+  // Force-extend the fullscreen canvases past every safe-area on iOS PWA
+  // standalone. Even screen.height on some iOS builds doesn't include the
+  // home indicator strip — over-shoot by 120px in both directions so the
+  // canvas physically covers any conceivable safe-area combination.
+  // (The extra pixels are off-screen for normal layouts, GPU shades a tiny
+  // bit extra but it's negligible compared to seeing a black bar.)
+  const BLEED = 120;
   const forceFullBleed = () => {
     const w = Math.max(screen.width, innerWidth);
     const h = Math.max(screen.height, innerHeight);
     [canvas, document.getElementById("medal-canvas")].forEach((c) => {
       if (!c || c.classList.contains("inline")) return;
-      c.style.width = w + "px";
-      c.style.height = h + "px";
+      c.style.width = w + BLEED + "px";
+      c.style.height = h + BLEED + "px";
       c.style.position = "fixed";
-      c.style.top = "0";
-      c.style.left = "0";
+      c.style.top = -BLEED / 2 + "px";
+      c.style.left = -BLEED / 2 + "px";
     });
   };
   forceFullBleed();
@@ -167,8 +169,8 @@ function init() {
   const resize = () => {
     forceFullBleed();
     // GL buffer size matches the inline-styled CSS pixels (with dpr).
-    const w = Math.max(screen.width, innerWidth);
-    const h = Math.max(screen.height, innerHeight);
+    const w = Math.max(screen.width, innerWidth) + BLEED;
+    const h = Math.max(screen.height, innerHeight) + BLEED;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     if (renderer) renderer.updateScale(dpr);
