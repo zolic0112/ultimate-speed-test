@@ -3,7 +3,7 @@
    - HTML / navigations: network-first (always show latest UI on refresh; cache fallback for offline).
    - Other shell assets (CSS/JS/icons): stale-while-revalidate (instant load, refreshed in background).
    - Cross-origin / speed test traffic: passthrough, never cached. */
-const VERSION = "ust-v69-shader-center";
+const VERSION = "ust-v70-no-scroll";
 const SHELL = [
   "./",
   "./index.html",

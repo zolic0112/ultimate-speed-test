@@ -41,25 +41,37 @@ html[data-lang="ja"] {
     padding: 0;
 }
 
-html,
+/* <html> is the positioned container for the bled background canvas.
+   It spans the LARGE viewport (100lvh, 844px on iPhone 14 PWA) so canvas
+   can position:absolute with negative top/left and extend past the visual
+   viewport into the home-indicator strip.
+   overflow:hidden + overscroll-behavior:none prevent the user from rubber-
+   band scrolling to see the extra height. */
+html {
+    position: relative;
+    width: 100%;
+    height: 100lvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--bg);
+}
+
 body {
     width: 100%;
+    /* Body stays at the visible (small) viewport so it doesn't trigger
+       document-level scroll, but it sits inside the larger html container
+       so the bled canvas behind it can extend into safe-area. */
     height: 100%;
-    /* Use LARGE viewport (100lvh) so html/body span the full physical screen
-       including the iOS home-indicator strip. 100dvh shrinks under browser
-       chrome and excludes safe-area — that's exactly what we DON'T want
-       since #bg uses position:absolute relative to html. */
-    min-height: 100lvh;
     overflow: hidden;
-    background: var(--bg);
+    overscroll-behavior: none;
+    background: transparent; /* let the canvas show through */
     color: var(--fg);
     font-family: var(--font-display);
     font-feature-settings: "ss01", "ss02", "tnum";
     -webkit-font-smoothing: antialiased;
     user-select: none;
-    /* `none` would disable mobile vertical scrolling on the result screen.
-       `pan-y` allows top-down scroll while still suppressing the browser's
-       native pinch-zoom (which we don't want for a fullscreen shader UI). */
+    /* `pan-y` allows the result screen's own scroll container to receive
+       touch events; `touch-action: none` globally would block that. */
     touch-action: pan-y;
 }
 
