@@ -512,23 +512,46 @@ class SpeedTest {
 
     let final = sustainedMbps;
     // Flag set when we couldn't use proper sustained-window averaging and
-    // had to fall back to "any bytes / elapsed". The value isn't necessarily
-    // wrong but is statistically less reliable — UI surfaces this with a
+    // had to fall back to a tighter-ramp computation. The value is in the
+    // right ballpark but less statistically clean — UI surfaces this with a
     // tilde/est marker rather than reporting N/A.
     this.uploadEstimated = false;
     if (final === 0) {
-      let totalBytes = 0;
-      let maxTime = 0;
-      for (const s of streamSamples) {
-        if (s.length) {
-          totalBytes += s[s.length - 1].loaded;
-          maxTime = Math.max(maxTime, s[s.length - 1].t);
+      // Tighter ramp (200ms) than the primary path (500-1000ms), but still
+      // skips the very-first socket-buffer-fill period that wildly inflates
+      // perceived throughput. Without this skip the fallback typically
+      // over-reports by 2-3× because xhr.upload.onprogress measures bytes
+      // accepted into the OS send buffer, not bytes actually on the wire.
+      const SHORT_RAMP = 200;
+      const SHORT_WINDOW_SEC = 0.15;
+      let estMbps = 0;
+      let estStreams = 0;
+      for (const samples of streamSamples) {
+        if (samples.length < 2) continue;
+        let startIdx = -1;
+        for (let i = 0; i < samples.length; i++) {
+          if (samples[i].t >= SHORT_RAMP) {
+            startIdx = i;
+            break;
+          }
+        }
+        if (startIdx < 0 || startIdx >= samples.length - 1) continue;
+        const start = samples[startIdx];
+        const end = samples[samples.length - 1];
+        const dtSec = (end.t - start.t) / 1000;
+        if (dtSec < SHORT_WINDOW_SEC) continue;
+        const mbps = ((end.loaded - start.loaded) * 8) / 1e6 / dtSec;
+        if (mbps > 0) {
+          estMbps += mbps;
+          estStreams++;
         }
       }
-      const measuredMs = maxTime || totalElapsed;
-      if (totalBytes > 0 && measuredMs > 200) {
-        final = (totalBytes * 8) / 1e6 / (measuredMs / 1000);
-        this.uploadEstimated = true; // fallback path used
+      if (estMbps > 0) {
+        final = estMbps;
+        this.uploadEstimated = true;
+        this.log(
+          `Upload fallback: ${estStreams} streams, short-ramp ${SHORT_RAMP}ms → ${final.toFixed(1)} Mbps`,
+        );
       }
     } else if (usableStreams < streams) {
       // Some streams measured but not all — partial confidence
