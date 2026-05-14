@@ -1562,6 +1562,9 @@ body[data-bp="mobile"] #screen-result .v3-medal-slot {
     justify-content: center;
     gap: 12px;
     padding: 18px 36px;
+    /* Lock minimum width so language switches don't reshape the button.
+       Native apps don't have buttons that resize on locale change. */
+    min-width: 200px;
     border-radius: 999px;
     background: linear-gradient(
         180deg,
@@ -1600,6 +1603,7 @@ body[data-bp="mobile"] #screen-result .v3-medal-slot {
     justify-content: center;
     gap: 10px;
     padding: 14px 24px;
+    min-width: 120px; /* lock width so localised labels don't reshape it */
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(20px) saturate(140%);
@@ -1831,8 +1835,12 @@ body[data-bp="mobile"] #screen-result .v3-medal-slot {
 .v3-cap-pill {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 5px 10px;
+    /* Lock width so capability pills don't reflow across languages
+       (HD CALL ↔ HD 通話 ↔ HD通話 ↔ HD通話 etc). */
+    min-width: 72px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1990,6 +1998,10 @@ html[data-lang="ja"] .v3-idle-serif {
     letter-spacing: -0.02em;
     line-height: 1.1;
     margin: 0 auto 16px;
+    /* Reserve 2 lines worth of vertical space so elements below the title
+       don't jump when the localised text breaks differently (en vs zh vs ja).
+       Native-app feel: layout stable across locales. */
+    min-height: 2.2em;
     /* no max-width — let it flow naturally; container padding (56px) provides the bound */
 }
 .v3-idle-serif em {
@@ -2289,11 +2301,14 @@ body[data-bp="mobile"] .v3-testing-chips .v3-metric-chip {
     pointer-events: auto;
 }
 
-/* Grade pill text sub-line (incomplete / desc) */
+/* Grade pill text sub-line (incomplete / desc).
+   min-width keeps the pill from shrinking/growing when the caption
+   ("GIGABIT TERRITORY" ↔ "優秀" etc.) changes width on locale switch. */
 .v3-grade-pill-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 160px;
 }
 .v3-grade-sub {
     font-family: var(--font-mono);
@@ -2368,6 +2383,28 @@ html[data-lang="ja"] .v3-result-headline {
     transform: translate(-50%, -50%);
     min-width: 156px;
     pointer-events: auto; /* each chip opts back in individually */
+}
+
+/* "Estimate" marker — applied when upload fell back to a best-effort
+   computation rather than statistically clean sustained-window mean.
+   Subtle: italic value + tiny EST badge in corner. */
+.v3-orbit-chip.is-estimate {
+    position: relative;
+}
+.v3-orbit-chip.is-estimate .value {
+    color: var(--w-80);
+    font-style: italic;
+}
+.v3-orbit-chip.is-estimate::after {
+    content: "EST";
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    color: var(--w-40);
+    pointer-events: none;
 }
 /* Desktop orbit — ring = 360px, medal anchored at 46% */
 .v3-orbit-chip[data-chip="down"] {

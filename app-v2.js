@@ -256,7 +256,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v77 PWA:${standalone ? "Y" : "N"} ` +
+      `v78 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -639,9 +639,24 @@ function init() {
 
       // Populate result
       $("r-down").textContent = fmt(results.download, 2);
-      // Show 'N/A' if upload was blocked by CORS (rather than misleading '0.00')
-      $("r-up").textContent =
-        uploadBlocked && results.upload === 0 ? "N/A" : fmt(results.upload, 2);
+      // Upload value display:
+      //  - true CORS/network block (0 bytes): N/A
+      //  - measured via fallback path (partial / sustained-mean unavailable):
+      //    tilde-prefixed + .is-estimate class so styles can dim it slightly,
+      //    signalling "best-effort number, not gold standard"
+      //  - otherwise: plain number
+      const upChip = document.querySelector('.v3-orbit-chip[data-chip="up"]');
+      const rUp = $("r-up");
+      if (uploadBlocked && results.upload === 0) {
+        rUp.textContent = "N/A";
+        if (upChip) upChip.classList.remove("is-estimate");
+      } else if (results.uploadEstimated) {
+        rUp.textContent = "~" + fmt(results.upload, 2);
+        if (upChip) upChip.classList.add("is-estimate");
+      } else {
+        rUp.textContent = fmt(results.upload, 2);
+        if (upChip) upChip.classList.remove("is-estimate");
+      }
       $("r-ping").textContent = fmt(results.ping, 1);
       $("r-jitter").textContent = fmt(results.jitter, 1);
 

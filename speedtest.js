@@ -100,7 +100,13 @@ class SpeedTest {
   }
 
   async run() {
-    const results = { ping: 0, jitter: 0, download: 0, upload: 0 };
+    const results = {
+      ping: 0,
+      jitter: 0,
+      download: 0,
+      upload: 0,
+      uploadEstimated: false,
+    };
     try {
       this.emit("phase", { phase: "ping" });
       const p = await this.measurePing(20, 5);
@@ -118,7 +124,13 @@ class SpeedTest {
       // fallback never gets used when the Worker is unavailable.
       await this._probeUploadEndpoint();
       results.upload = await this.measureUpload(10000);
-      this.log("Upload:", results.upload.toFixed(1), "Mbps");
+      results.uploadEstimated = !!this.uploadEstimated;
+      this.log(
+        "Upload:",
+        results.upload.toFixed(1),
+        "Mbps",
+        results.uploadEstimated ? "(estimated)" : "",
+      );
 
       this.emit("done", results);
       return results;
@@ -499,9 +511,11 @@ class SpeedTest {
     }
 
     let final = sustainedMbps;
-    // Fallback: any bytes uploaded at all → compute overall throughput.
-    // This catches the "stream errored partway through ramp-up but did send
-    // some data" case, which previously returned 0 = N/A.
+    // Flag set when we couldn't use proper sustained-window averaging and
+    // had to fall back to "any bytes / elapsed". The value isn't necessarily
+    // wrong but is statistically less reliable — UI surfaces this with a
+    // tilde/est marker rather than reporting N/A.
+    this.uploadEstimated = false;
     if (final === 0) {
       let totalBytes = 0;
       let maxTime = 0;
@@ -512,8 +526,13 @@ class SpeedTest {
         }
       }
       const measuredMs = maxTime || totalElapsed;
-      if (totalBytes > 0 && measuredMs > 200)
+      if (totalBytes > 0 && measuredMs > 200) {
         final = (totalBytes * 8) / 1e6 / (measuredMs / 1000);
+        this.uploadEstimated = true; // fallback path used
+      }
+    } else if (usableStreams < streams) {
+      // Some streams measured but not all — partial confidence
+      this.uploadEstimated = true;
     }
 
     if (corsFailed && final === 0) {
