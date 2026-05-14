@@ -888,6 +888,29 @@
         requestAnimationFrame(this._loop);
         return;
       }
+
+      // Mobile: cap medal at ~30fps. The medal is always small (260×260
+      // inline or dimmed full-bleed during testing) and the visible change
+      // between frames is subtle (slow auto-rotation + soft float). Halving
+      // the frame rate roughly halves GPU + scene-graph update cost.
+      // Exception: while the user is actively dragging, render at full rate
+      // so input feels responsive. (rotVel != 0 indicates active gesture.)
+      const isMobile =
+        innerWidth < 768 ||
+        (typeof matchMedia !== "undefined" &&
+          matchMedia("(pointer: coarse)").matches);
+      const interacting =
+        Math.abs(this.rotVel.x) > 0.0005 ||
+        Math.abs(this.rotVel.y) > 0.0005 ||
+        this._entering;
+      if (isMobile && !interacting) {
+        // Skip every other frame
+        this._frameToggle = (this._frameToggle || 0) ^ 1;
+        if (this._frameToggle === 0) {
+          requestAnimationFrame(this._loop);
+          return;
+        }
+      }
       // ── Testing phase opacity fade ──────────────────────────────────
       // When testing, the medal gradually becomes more visible (fades from
       // transparent to fully solid) over ~2-3 seconds.

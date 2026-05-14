@@ -26,24 +26,35 @@ function init() {
   const body = document.body;
 
   // ── i18n initialization ─────────────────────────────────────────────────
+  // Cache the translatable elements + their key on first scan. The DOM set
+  // doesn't change after page load, so re-scanning every language switch is
+  // wasted work (full document querySelectorAll + getAttribute per element).
+  // We also pre-detect whether each element needs innerHTML (translation has
+  // child tags like <em>) vs cheap textContent, so the hot path avoids the
+  // .includes("<") string scan on every switch.
+  let i18nTargets = null;
   const applyTranslations = () => {
-    document.querySelectorAll("[data-i18n]").forEach((el) => {
-      const key = el.getAttribute("data-i18n");
-      const html = I18N.get(key);
-      // For elements that might have inner elements (like <em>), we should be careful.
-      // If the element has children, only update the text nodes, otherwise replace all.
-      if (el.children.length === 0) {
-        el.textContent = html;
+    if (!i18nTargets) {
+      i18nTargets = [];
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        i18nTargets.push({
+          el,
+          key: el.getAttribute("data-i18n"),
+          hasChildren: el.children.length > 0,
+        });
+      });
+    }
+    for (let i = 0; i < i18nTargets.length; i++) {
+      const t = i18nTargets[i];
+      const html = I18N.get(t.key);
+      // If the element has child tags we must use innerHTML to preserve any
+      // markup in the translation; otherwise textContent is faster and safer.
+      if (t.hasChildren || (html.length > 1 && html.indexOf("<") !== -1)) {
+        t.el.innerHTML = html;
       } else {
-        // Has children, try to preserve them but update text content where possible.
-        // For now, just set innerHTML if the translation has markup.
-        if (html.includes("<")) {
-          el.innerHTML = html;
-        } else {
-          el.textContent = html;
-        }
+        t.el.textContent = html;
       }
-    });
+    }
   };
 
   const setupLanguageSwitcher = () => {
@@ -86,10 +97,15 @@ function init() {
 
   // ── Breakpoint detection ────────────────────────────────────────────────
   // Drives the v3 responsive layout via CSS [data-bp="mobile|tablet|desktop"].
-  // Also feeds media-query-safe size variants without duplicating markup.
+  // Resize events can fire 100+ times during landscape rotation animation;
+  // short-circuit when the breakpoint hasn't actually changed.
+  let lastBp = null;
   const setBreakpoint = () => {
     const w = window.innerWidth;
-    body.dataset.bp = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+    const bp = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+    if (bp === lastBp) return; // no change → skip DOM write + medal re-place
+    lastBp = bp;
+    body.dataset.bp = bp;
     placeMedalCanvas();
   };
 
@@ -109,11 +125,18 @@ function init() {
   // medal MUST be centred-fullscreen to read as 'sitting inside the tunnel'.
   // The dim filter (set elsewhere) keeps it from competing with the number.
   const INLINEABLE_PHASES = new Set(["idle", "result"]);
+  // Cache: medal canvas + screen lookups never change after page load.
+  const medalCanvasEl = document.getElementById("medal-canvas");
+  const screenEls = {
+    idle: document.getElementById("screen-idle"),
+    testing: document.getElementById("screen-testing"),
+    result: document.getElementById("screen-result"),
+  };
   const placeMedalCanvas = () => {
-    const c = document.getElementById("medal-canvas");
+    const c = medalCanvasEl;
     if (!c) return;
     const phase = body.dataset.phase || "idle";
-    const activeScreen = document.getElementById(`screen-${phase}`);
+    const activeScreen = screenEls[phase];
     const slot =
       body.dataset.bp === "mobile" &&
       INLINEABLE_PHASES.has(phase) &&
@@ -233,7 +256,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v75 PWA:${standalone ? "Y" : "N"} ` +
+      `v76 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
