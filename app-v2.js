@@ -233,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v74 PWA:${standalone ? "Y" : "N"} ` +
+      `v75 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -317,9 +317,7 @@ function init() {
     pointerState.y = y;
     renderer.updateMouse([x, y]);
     renderer.updatePointerCoords([x, y]);
-    const ptr = document.getElementById("hud-ptr");
-    if (ptr)
-      ptr.textContent = `${x >= 0 ? "+" : ""}${x.toFixed(2)}, ${y >= 0 ? "+" : ""}${y.toFixed(2)}`;
+    // (removed dead update to #hud-ptr — display:none in v3)
   });
   renderer.updatePointerCount(1);
 
@@ -362,9 +360,8 @@ function init() {
       shaderState.speed *= 0.95;
     }
 
-    const hs = document.getElementById("hud-shader");
-    if (hs)
-      hs.textContent = (shaderState.speed * tweaks.intensity).toFixed(2) + "×";
+    // (removed per-frame update to #hud-shader — display:none in v3.
+    //  Was thrashing layout 60×/sec on mobile for zero visible effect.)
 
     // Frame-skip during transitions on mobile to free up GPU for DOM/medal work.
     // Skip when phase is interpolating (gap > 0.02 means still animating).
@@ -379,14 +376,18 @@ function init() {
   loop(0);
 
   // ---------- Clock ----------
+  // #foot-clock is opacity:0 in v3, so the per-second update is purely battery
+  // burn on mobile. Run only if the element is somehow made visible later.
   const clock = document.getElementById("foot-clock");
-  const tick = () => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    clock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} UTC${d.getTimezoneOffset() <= 0 ? "+" : "-"}${pad(Math.abs(d.getTimezoneOffset() / 60) | 0)}`;
-  };
-  tick();
-  setInterval(tick, 1000);
+  if (clock && getComputedStyle(clock).opacity !== "0") {
+    const tick = () => {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      clock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} UTC${d.getTimezoneOffset() <= 0 ? "+" : "-"}${pad(Math.abs(d.getTimezoneOffset() / 60) | 0)}`;
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
 
   // ---------- Medal (three.js) ----------
   const medalCanvas = document.getElementById("medal-canvas");
@@ -424,8 +425,7 @@ function init() {
     );
     body.dataset.phase = name;
     placeMedalCanvas(); // re-parent canvas if entering/leaving mobile result
-    const hp = document.getElementById("hud-phase");
-    if (hp) hp.textContent = name.toUpperCase();
+    // (removed dead update to #hud-phase — display:none in v3)
     // Medal is interactive on idle + result; testing keeps it passive
     // so the user can't accidentally interrupt the live readout's framing.
     if (medal) medal.setActive(name === "result" || name === "idle");
@@ -439,22 +439,19 @@ function init() {
     $("live-value").textContent = fmt(value, d);
     $("live-unit").textContent = unit;
   };
-  const setStep = (name, state /* 'active'|'done' */, p = 0) => {
-    document.querySelectorAll(".step").forEach((s) => {
-      if (s.dataset.step === name) {
-        s.classList.remove("done", "active");
-        s.classList.add(state);
-        s.style.setProperty("--p", p);
-      }
-    });
+  // --p custom prop is referenced only by `.step.active .step-bar` (CSS), but
+  // .step-bar never appears in the v3 markup — so setting --p is a no-op.
+  const setStep = (name, state /* 'active'|'done' */) => {
+    const el = document.querySelector(`.step[data-step="${name}"]`);
+    if (!el) return;
+    el.classList.remove("done", "active");
+    el.classList.add(state);
   };
   const markDone = (name) => {
     const el = document.querySelector(`.step[data-step="${name}"]`);
-    if (el) {
-      el.classList.remove("active");
-      el.classList.add("done");
-      el.style.setProperty("--p", 1);
-    }
+    if (!el) return;
+    el.classList.remove("active");
+    el.classList.add("done");
   };
 
   // ---------- Sparkline ----------
@@ -511,13 +508,8 @@ function init() {
     t0 = performance.now();
     $("hud-peak").textContent = "0.00 Mbps";
     $("hud-avg").textContent = "0.00 Mbps";
-    $("hud-samples").textContent = "0";
-    $("hud-bytes").textContent = "0 MB";
     $("hud-elapsed").textContent = "00.0s";
-    $("hud-sid").textContent = Math.random()
-      .toString(36)
-      .slice(2, 8)
-      .toUpperCase();
+    // (removed dead init of #hud-samples, #hud-bytes, #hud-sid — display:none in v3)
     resetSpark();
     document.querySelectorAll(".step").forEach((s) => {
       s.classList.remove("active", "done");
@@ -591,17 +583,7 @@ function init() {
 
     test.on("progress", ({ phase, mbps, progress, ping }) => {
       sampleCount++;
-      $("hud-samples").textContent = sampleCount;
-      const pctTotal =
-        phase === "ping"
-          ? progress * 0.2
-          : phase === "download"
-            ? 0.2 + progress * 0.45
-            : 0.65 + progress * 0.35;
-      $("progress-fill").style.width = (pctTotal * 100).toFixed(1) + "%";
-
-      const step = document.querySelector(`.step[data-step="${phase}"]`);
-      if (step) step.style.setProperty("--p", progress);
+      // (removed dead updates to #hud-samples and #progress-fill — display:none in v3)
 
       if (phase === "ping") {
         if (ping != null) {
@@ -617,9 +599,8 @@ function init() {
         if (phase === "upload") partial.upload = Math.max(partial.upload, mbps);
         // v3 chips show the unit separately, so write numbers only.
         $("hud-peak").textContent = peakMbps.toFixed(1);
-        const elapsed = Math.max(0.1, (performance.now() - t0) / 1000);
         $("hud-avg").textContent = mbps.toFixed(1);
-        $("hud-bytes").textContent = ((mbps * elapsed) / 8).toFixed(1) + " MB";
+        // (removed dead update to #hud-bytes — display:none in v3)
         pushSpark(mbps);
         shaderState.speed = Math.min(mbps / 800, 1.0);
       }

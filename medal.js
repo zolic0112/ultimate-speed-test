@@ -944,21 +944,25 @@
       this.camera.position.z = this.zoom;
 
       // ---- Dust orbit ────────────────────────────────────────────────
-      // Simple ambient orbit around the medal.
+      // Simple ambient orbit around the medal. Only when active (idle/result)
+      // — during testing the dust is hidden, so skip the 240-particle math
+      // and GPU buffer upload entirely. Updates resume the moment dust becomes
+      // visible again.
       if (this.dust && this.dustMeta) {
-        const pos = this.dust.geometry.attributes.position.array;
-        const meta = this.dustMeta;
-        const time = t * 0.001;
-        for (let i = 0; i < meta.length / 3; i++) {
-          const r = meta[i * 3]; // radius (fixed)
-          const sp = meta[i * 3 + 2]; // speed
-          const a = meta[i * 3 + 1] + time * sp * 0.2; // angle += speed*time
-          pos[i * 3] = Math.cos(a) * r;
-          pos[i * 3 + 2] = Math.sin(a) * r;
-        }
-        this.dust.geometry.attributes.position.needsUpdate = true;
-        // Visible during idle/result interaction
         this.dust.visible = this.active;
+        if (this.active) {
+          const pos = this.dust.geometry.attributes.position.array;
+          const meta = this.dustMeta;
+          const time = t * 0.001;
+          for (let i = 0; i < meta.length / 3; i++) {
+            const r = meta[i * 3];
+            const sp = meta[i * 3 + 2];
+            const a = meta[i * 3 + 1] + time * sp * 0.2;
+            pos[i * 3] = Math.cos(a) * r;
+            pos[i * 3 + 2] = Math.sin(a) * r;
+          }
+          this.dust.geometry.attributes.position.needsUpdate = true;
+        }
       }
 
       this.renderer.render(this.scene, this.camera);
