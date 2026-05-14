@@ -233,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v72 PWA:${standalone ? "Y" : "N"} ` +
+      `v73 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;

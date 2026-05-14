@@ -2645,12 +2645,14 @@ body[data-bp="mobile"] #screen-result {
     display: flex !important;
     flex-direction: column;
     align-items: center;
-    /* space-between distributes the column so grade pill stays near top,
-       buttons stay near bottom, medal + chips fill the middle. */
-    justify-content: space-between;
+    /* center distribution + small explicit gap — keeps things tight in
+       the middle of the viewport rather than spreading them out. */
+    justify-content: center;
     pointer-events: auto !important;
-    gap: 8px;
-    padding: calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+    gap: 12px;
+    /* Top padding clears the chrome buttons (logo, lang, history, about)
+       which sit in a ~52px band at the top with their own safe-area. */
+    padding: calc(64px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
     /* Compact design fits within viewport — overflow:hidden keeps it locked
        to the screen rather than scrolling. */
     overflow: hidden;
