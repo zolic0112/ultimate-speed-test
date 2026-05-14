@@ -53,7 +53,7 @@ class SpeedTest {
       (typeof window !== "undefined" && window.UPLOAD_PROXY_URL) || null,
     ].filter(Boolean);
 
-    const PROBE_TIMEOUT = 5000; // 5s for CORS preflight + TLS on slow mobile
+    const PROBE_TIMEOUT = 8000; // 8s — weak 4G can need >5s for TLS handshake
 
     for (const url of candidates) {
       try {
@@ -361,10 +361,16 @@ class SpeedTest {
     // Each stream runs a loop: send chunk → wait for finish → send next chunk …
     // until the timeout window is almost exhausted.
     // `loaded` is cumulative across all chunks so the rate algo sees a smooth curve.
+    //
+    // On weak/flaky networks the first chunk can fail mid-handshake. We retry
+    // up to MAX_FIRST_RETRIES times before giving up on a stream — this is the
+    // main reason uploads no longer go N/A on iffy 4G.
+    const MAX_FIRST_RETRIES = 2;
     const runStream = (idx) =>
       new Promise((resolve) => {
         const samples = streamSamples[idx];
-        let chunksSent = 0; // chunks successfully started (used as byte offset)
+        let chunksSent = 0;
+        let firstChunkRetries = 0;
         let stopped = false;
 
         const sendChunk = () => {
@@ -373,10 +379,10 @@ class SpeedTest {
           if (remaining < 200) {
             resolve();
             return;
-          } // too little time left
+          }
 
           const xhr = new XMLHttpRequest();
-          const offset = chunksSent * this.UP_BYTES; // byte offset for this chunk
+          const offset = chunksSent * this.UP_BYTES;
 
           xhr.upload.onprogress = (e) => {
             if (!e.lengthComputable) return;
@@ -396,15 +402,26 @@ class SpeedTest {
           const finishChunk = (reason) => {
             this.log(`  stream #${idx} chunk #${chunksSent}: ${reason}`);
             if (stopped) return;
-            // Abort the outer stream if this was a hard CORS block (zero samples ever).
+            // First-chunk error with no samples yet: retry up to MAX_FIRST_RETRIES
+            // before giving up. Most "N/A on weak network" cases are a transient
+            // handshake failure on the first attempt that succeeds on retry.
             if (reason === "error" && samples.length === 0) {
+              if (firstChunkRetries < MAX_FIRST_RETRIES) {
+                firstChunkRetries++;
+                this.log(
+                  `  stream #${idx} retry ${firstChunkRetries}/${MAX_FIRST_RETRIES}`,
+                );
+                // Small backoff before retry so we don't hammer a stuck endpoint
+                setTimeout(sendChunk, 300);
+                return;
+              }
+              // Out of retries — likely real CORS/network block
               corsFailed = true;
               stopped = true;
               resolve();
               return;
             }
             chunksSent++;
-            // Kick off the next chunk immediately (no setTimeout overhead).
             sendChunk();
           };
 
@@ -452,7 +469,11 @@ class SpeedTest {
     const totalElapsed = performance.now() - t0;
 
     // Final: discard first 1 s (ramp-up), measure sustained rate.
-    const RAMP_MS = 1000;
+    // On weak networks total transfer time may be brief, so accept shorter
+    // sustained windows (0.3s instead of 0.5s) and shorter ramp-up if total
+    // elapsed is small.
+    const RAMP_MS = totalElapsed < 3000 ? 500 : 1000;
+    const MIN_WINDOW_SEC = 0.3;
     let sustainedMbps = 0;
     let usableStreams = 0;
 
@@ -469,7 +490,7 @@ class SpeedTest {
       const start = samples[startIdx];
       const end = samples[samples.length - 1];
       const dtSec = (end.t - start.t) / 1000;
-      if (dtSec < 0.5) continue;
+      if (dtSec < MIN_WINDOW_SEC) continue;
       const mbps = ((end.loaded - start.loaded) * 8) / 1e6 / dtSec;
       if (mbps > 0) {
         sustainedMbps += mbps;
@@ -478,13 +499,21 @@ class SpeedTest {
     }
 
     let final = sustainedMbps;
+    // Fallback: any bytes uploaded at all → compute overall throughput.
+    // This catches the "stream errored partway through ramp-up but did send
+    // some data" case, which previously returned 0 = N/A.
     if (final === 0) {
       let totalBytes = 0;
+      let maxTime = 0;
       for (const s of streamSamples) {
-        if (s.length) totalBytes += s[s.length - 1].loaded;
+        if (s.length) {
+          totalBytes += s[s.length - 1].loaded;
+          maxTime = Math.max(maxTime, s[s.length - 1].t);
+        }
       }
-      if (totalBytes > 0 && totalElapsed > 0)
-        final = (totalBytes * 8) / 1e6 / (totalElapsed / 1000);
+      const measuredMs = maxTime || totalElapsed;
+      if (totalBytes > 0 && measuredMs > 200)
+        final = (totalBytes * 8) / 1e6 / (measuredMs / 1000);
     }
 
     if (corsFailed && final === 0) {

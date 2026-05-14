@@ -233,7 +233,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v73 PWA:${standalone ? "Y" : "N"} ` +
+      `v74 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -336,7 +336,11 @@ function init() {
   }));
 
   // ---------- Render loop ----------
+  // On mobile we render the shader at half-rate (30fps) while a phase
+  // transition is animating: it visibly helps weak GPUs survive the moment
+  // when DOM updates + medal swap + uniform interpolation all hit at once.
   let lastT = 0;
+  let frameToggle = 0;
   const loop = (now) => {
     const dt = Math.min(0.05, (now - lastT) / 1000 || 0);
     lastT = now;
@@ -361,7 +365,15 @@ function init() {
     const hs = document.getElementById("hud-shader");
     if (hs)
       hs.textContent = (shaderState.speed * tweaks.intensity).toFixed(2) + "×";
-    renderer.render(now);
+
+    // Frame-skip during transitions on mobile to free up GPU for DOM/medal work.
+    // Skip when phase is interpolating (gap > 0.02 means still animating).
+    const inTransition =
+      Math.abs(shaderState.phaseTarget - shaderState.phase) > 0.02;
+    frameToggle = (frameToggle + 1) % 2;
+    const skipFrame = isMobileDevice && inTransition && frameToggle === 0;
+    if (!skipFrame) renderer.render(now);
+
     requestAnimationFrame(loop);
   };
   loop(0);
@@ -449,9 +461,17 @@ function init() {
   const sparkLine = $("spark-line");
   const sparkFill = $("spark-fill");
   const sparkData = [];
+  // The #spark SVG has `display: none` (v3 doesn't surface it). Computing a
+  // new path on every progress event (every 100ms) was a meaningful waste of
+  // main-thread time on weak devices — skip the work when hidden.
+  const sparkHidden =
+    !sparkLine ||
+    !sparkLine.parentElement ||
+    getComputedStyle(sparkLine.parentElement).display === "none";
   const pushSpark = (mbps) => {
     sparkData.push(mbps);
     if (sparkData.length > 80) sparkData.shift();
+    if (sparkHidden) return;
     const max = Math.max(1, ...sparkData);
     const W = 200,
       H = 48;
@@ -472,6 +492,7 @@ function init() {
   };
   const resetSpark = () => {
     sparkData.length = 0;
+    if (sparkHidden) return;
     sparkLine.setAttribute("d", "");
     sparkFill.setAttribute("d", "");
   };
