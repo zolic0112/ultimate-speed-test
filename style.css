@@ -1462,16 +1462,13 @@ body[data-bp="mobile"] #screen-idle .v3-medal-slot {
     width: min(460px, 82vw);
     height: min(460px, 82vw);
 }
-/* Mobile result medal: large (380px) so it has real visual weight and is
-   easy to drag/zoom on touch. margin pushes it down a touch so it sits
-   slightly below the grade pill and partially overlaps the chip area below
-   — letting the cosmic background flow through the empty corners of the
-   square slot instead of cleanly stacking. */
+/* Mobile result medal: compact 240px so the whole result fits within the
+   visible viewport (no scrolling needed on iPhone 14 PWA, 844px tall).
+   Use min(...) so smaller phones still get a proportional medal. */
 body[data-bp="mobile"] #screen-result .v3-medal-slot {
-    width: 380px;
-    height: 380px;
-    margin-top: 8px;
-    margin-bottom: -32px;
+    width: min(240px, 58vw);
+    height: min(240px, 58vw);
+    margin: 0;
 }
 
 /* ============================================================
@@ -2648,16 +2645,16 @@ body[data-bp="mobile"] #screen-result {
     display: flex !important;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start; /* align to top, let content flow down */
+    /* space-between distributes the column so grade pill stays near top,
+       buttons stay near bottom, medal + chips fill the middle. */
+    justify-content: space-between;
     pointer-events: auto !important;
-    gap: 16px;
-    padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    /* Re-enable vertical pan inside this scroll container (body uses
-       touch-action: none to block document-level scroll). */
-    touch-action: pan-y;
+    gap: 8px;
+    padding: calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+    /* Compact design fits within viewport — overflow:hidden keeps it locked
+       to the screen rather than scrolling. */
+    overflow: hidden;
+    touch-action: none;
     height: 100vh;
     height: 100dvh;
 }
@@ -2675,7 +2672,7 @@ body[data-bp="mobile"] .v3-chip-orbit {
     inset: auto !important;
     display: grid !important;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 6px;
     padding: 0;
     width: 100%;
     max-width: 420px;
@@ -2690,36 +2687,69 @@ body[data-bp="mobile"] .v3-orbit-chip[data-chip="jitter"] {
     top: auto !important;
     transform: none !important;
     min-width: 0;
-    padding: 14px 16px;
+    padding: 8px 12px;
+    gap: 2px;
 }
 body[data-bp="mobile"] .v3-orbit-chip .label {
-    font-size: 10px;
+    font-size: 9px;
 }
 body[data-bp="mobile"] .v3-orbit-chip .value {
-    font-size: 26px;
+    font-size: 22px;
+    line-height: 1.05;
 }
 body[data-bp="mobile"] .v3-orbit-chip .unit {
-    font-size: 12px;
+    font-size: 11px;
 }
 body[data-bp="mobile"] .v3-result-bottom {
     position: static !important;
     bottom: auto !important;
     padding: 0;
-    gap: 14px;
+    gap: 6px;
     width: 100%;
     max-width: 420px;
 }
+body[data-bp="mobile"] .v3-result-info {
+    gap: 4px !important;
+}
 body[data-bp="mobile"] #screen-result .v3-capsule-primary {
-    padding: 18px 36px !important;
-    font-size: 14px !important;
+    padding: 12px 28px !important;
+    font-size: 13px !important;
 }
 body[data-bp="mobile"] .v3-cap-strip {
     flex-wrap: wrap !important;
-    gap: 4px;
+    gap: 3px;
+    justify-content: center;
+}
+body[data-bp="mobile"] .v3-cap-strip .head {
+    display: none; /* hide '// CAPABILITY' label to save vertical space */
 }
 body[data-bp="mobile"] .v3-cap-pill {
     font-size: 8px;
-    padding: 4px 8px;
+    padding: 3px 6px;
+}
+body[data-bp="mobile"] .v3-disclaimer {
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+    text-align: center;
+}
+body[data-bp="mobile"] .v3-disclaimer .tag {
+    display: none; /* hide '// NOTE' label to save horizontal space */
+}
+/* Grade pill: compact */
+body[data-bp="mobile"] .v3-grade-pill {
+    padding: 6px 14px 6px 6px !important;
+    gap: 10px !important;
+}
+body[data-bp="mobile"] .v3-grade-pill .badge {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 18px !important;
+}
+body[data-bp="mobile"] .v3-grade-pill .caption {
+    font-size: 11px !important;
+}
+body[data-bp="mobile"] .v3-grade-pill .v3-grade-sub {
+    font-size: 9px !important;
 }
 
 /* Mobile: Share button goes inline next to Run Again instead of floating absolutely.
