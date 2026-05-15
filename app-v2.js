@@ -248,7 +248,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v81 PWA:${standalone ? "Y" : "N"} ` +
+      `v82 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -378,6 +378,16 @@ function init() {
     const skipFrame = isMobileDevice && inTransition && frameToggle === 0;
     if (!skipFrame) renderer.render(now);
 
+    // Audio modulation (cheap — just gain/freq targetAtTime calls).
+    if (audio && audio.ctx) {
+      // Tunnel whoosh intensity follows shader speed (0..1+)
+      audio.setTunnelIntensity(Math.min(1, shaderState.speed));
+      // Medal rotation hum follows angular delta per frame
+      if (medal && medal._angularSpeed !== undefined) {
+        audio.setMotionVelocity(medal._angularSpeed);
+      }
+    }
+
     requestAnimationFrame(loop);
   };
   loop(0);
@@ -419,6 +429,61 @@ function init() {
       delay += 800;
     });
   }
+
+  // ── Audio engine ─────────────────────────────────────────────────────
+  // Synth-only: ambient drone + tunnel whoosh + forge bell + motion hum.
+  // Lazy-inits on the first user gesture (browser autoplay policy).
+  const audio = window.AudioEngine ? new window.AudioEngine() : null;
+  const SOUND_PREF_KEY = "ust.sound";
+  let soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== "off";
+
+  const initAudio = () => {
+    if (!audio) return;
+    audio.init();
+    audio.resume();
+    audio.setMuted(!soundEnabled);
+    if (soundEnabled) {
+      audio.startAmbient();
+      audio.startMotion(); // silent at rest; gain rises with medal rotation
+    }
+  };
+  // Init on any user gesture so autoplay policy is satisfied. Use {once}
+  // because we only need to init it once; subsequent toggles use setMuted.
+  const firstGesture = () => initAudio();
+  ["pointerdown", "keydown"].forEach((ev) =>
+    window.addEventListener(ev, firstGesture, { once: true, passive: true }),
+  );
+
+  const setSoundEnabled = (on) => {
+    soundEnabled = on;
+    localStorage.setItem(SOUND_PREF_KEY, on ? "on" : "off");
+    if (!audio || !audio.ctx) return;
+    audio.setMuted(!on);
+    if (on) {
+      if (!audio._ambient) audio.startAmbient();
+      if (!audio._motion) audio.startMotion();
+    } else if (audio._tunnel) {
+      audio.stopTunnel();
+    }
+  };
+
+  // Mute toggle button in the top-right chrome
+  const soundBtn = document.createElement("button");
+  soundBtn.className = "v3-icon-btn";
+  soundBtn.id = "nav-sound";
+  soundBtn.setAttribute("aria-label", "Toggle sound");
+  const renderSoundIcon = () => {
+    soundBtn.innerHTML = soundEnabled
+      ? '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4h3l4 3V5L6 8H3z"/><path d="M13 7c1.5 1 1.5 5 0 6"/><path d="M15.5 5c2.5 2 2.5 8 0 10"/></svg>'
+      : '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4h3l4 3V5L6 8H3z"/><line x1="13" y1="7" x2="17" y2="13"/><line x1="17" y1="7" x2="13" y2="13"/></svg>';
+  };
+  renderSoundIcon();
+  soundBtn.addEventListener("click", () => {
+    setSoundEnabled(!soundEnabled);
+    renderSoundIcon();
+  });
+  const _navContainer = document.querySelector(".v3-chrome.tr");
+  if (_navContainer) _navContainer.insertBefore(soundBtn, _navContainer.firstChild);
 
   // ---------- Screens ----------
   const screens = {
@@ -536,6 +601,11 @@ function init() {
       // Begin testing phase — medal will fade from transparent to solid.
       medal.startTesting();
     }
+    // Audio: tunnel whoosh starts here, dies on finalise.
+    if (audio && soundEnabled) {
+      audio.resume();
+      audio.startTunnel();
+    }
     resetTelemetry();
     if (elapsedTimer) clearInterval(elapsedTimer);
     elapsedTimer = setInterval(() => {
@@ -620,6 +690,8 @@ function init() {
       finalised = true;
       markDone("upload");
       if (elapsedTimer) clearInterval(elapsedTimer);
+      // Defensive: kill any still-running tunnel whoosh on incomplete/cancel
+      if (audio) audio.stopTunnel();
 
       // Populate result
       $("r-down").textContent = fmt(results.download, 2);
@@ -687,6 +759,10 @@ function init() {
       // Cinematic handoff: flash + shockwave ring + medal spring-in.
       // End the testing phase and trigger the spring-in animation.
       shaderState.burst = 1.0;
+      if (audio && soundEnabled) {
+        audio.stopTunnel();
+        audio.playForgeComplete();
+      }
       if (medal) {
         medal.endTesting();
         medal.burstIn();

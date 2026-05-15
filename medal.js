@@ -557,15 +557,13 @@
           const dtMs = Math.max(1, now - lastMoveT);
           lastMoveT = now;
 
+          // Globally toned-down ×0.6 (user wanted all rotation feel 40% slower).
           if (isMobile) {
-            // Mobile: speed-proportional sensitivity. A 1px nudge at 120ms
-            // intervals scales tiny; a 30px swipe at 8ms intervals scales
-            // 5-6× — the medal really kicks when you flick it.
-            // pixels/ms = pointer speed; multiplier ramps from ~1 (slow) to
-            // ~4 (fast 4 px/ms swipe).
+            // Mobile: speed-proportional sensitivity but reined-in.
+            // Slow drift ≈ 1×, fast flick ≈ ~2.4× (was 4×).
             const speed = Math.hypot(dx, dy) / dtMs;
             const boost = 1 + Math.min(speed * 1.2, 3.0);
-            const factor = 0.012 * boost; // base 2× the desktop sensitivity
+            const factor = 0.0072 * boost; // 0.012 × 0.6
             this.rotVel.y = dx * factor;
             this.rotVel.x = dy * factor;
             // Remember the most recent velocity so we can coast after release
@@ -573,9 +571,10 @@
             this._inertiaVel.x = this.rotVel.x;
             this._inertiaVel.y = this.rotVel.y;
           } else {
-            // Desktop: keep the original light, controlled feel
-            this.rotVel.y = dx * 0.006;
-            this.rotVel.x = dy * 0.006;
+            // Desktop also slowed 40% — the previous 0.006 mapping came in
+            // alongside the kinetic mobile work and was a bit zippy in tandem.
+            this.rotVel.y = dx * 0.0036; // 0.006 × 0.6
+            this.rotVel.x = dy * 0.0036;
           }
           this.rotTarget.y += this.rotVel.y;
           this.rotTarget.x += this.rotVel.x;
@@ -999,8 +998,16 @@
         // Damping factor: 0.08 felt heavy on mobile (~12 frames to catch up).
         // 0.2 on mobile makes the medal track the finger almost 1:1.
         const damp = this._isMobileInput ? 0.2 : 0.08;
+        const _prevRotY = this.body.rotation.y;
+        const _prevRotX = this.body.rotation.x;
         this.body.rotation.y += (this.rotTarget.y - this.body.rotation.y) * damp;
         this.body.rotation.x += (this.rotTarget.x - this.body.rotation.x) * damp;
+        // Per-frame angular delta — read by app-v2 to drive the motion-hum
+        // sound (lightsaber-style: louder/higher with faster rotation).
+        this._angularSpeed = Math.hypot(
+          this.body.rotation.y - _prevRotY,
+          this.body.rotation.x - _prevRotX,
+        );
 
         // ---- Gentle float, honouring the auto-centre offset ----
         this.body.position.x = this._centerOffset.x;

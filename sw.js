@@ -3,7 +3,7 @@
    - HTML / navigations: network-first (always show latest UI on refresh; cache fallback for offline).
    - Other shell assets (CSS/JS/icons): stale-while-revalidate (instant load, refreshed in background).
    - Cross-origin / speed test traffic: passthrough, never cached. */
-const VERSION = "ust-v81-kinetic-medal";
+const VERSION = "ust-v82-audio-and-slower";
 const SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const SHELL = [
   "./speedtest.js",
   "./medal.js",
   "./share-card.js",
+  "./audio.js",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
