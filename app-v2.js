@@ -258,7 +258,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v84 PWA:${standalone ? "Y" : "N"} ` +
+      `v85 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -447,6 +447,8 @@ function init() {
   //  init() so the earlier-running render loop can reference them safely.)
   try {
     audio = window.AudioEngine ? new window.AudioEngine() : null;
+    // Expose for the tuning panel (audio-tune.js, toggle with T key)
+    window.__audioEngine = audio;
     const SOUND_PREF_KEY = "ust.sound";
     soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== "off";
 
