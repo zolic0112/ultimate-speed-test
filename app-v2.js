@@ -25,6 +25,16 @@ function init() {
 
   const body = document.body;
 
+  // Forward-declare audio state at the very top so the render loop (which
+  // references `audio`) doesn't hit a Temporal Dead Zone when it fires
+  // synchronously via loop(0) — that happens earlier in init() than the
+  // audio block itself runs. Real values are assigned inside the audio
+  // setup try/catch below. Without these `let` hoists, loop(0) → reads
+  // `audio` → ReferenceError → aborts the entire init().
+  let audio = null;
+  let soundEnabled = false;
+  let setSoundEnabled = () => {};
+
   // ── i18n initialization ─────────────────────────────────────────────────
   // Cache the translatable elements + their key on first scan. The DOM set
   // doesn't change after page load, so re-scanning every language switch is
@@ -248,7 +258,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v83 PWA:${standalone ? "Y" : "N"} ` +
+      `v84 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -433,9 +443,8 @@ function init() {
   // ── Audio engine ─────────────────────────────────────────────────────
   // Defensive: ANY failure here must not break the rest of init. Sound is
   // optional polish; the speed test itself must work even if audio breaks.
-  let audio = null;
-  let soundEnabled = false;
-  let setSoundEnabled = () => {};
+  // (audio/soundEnabled/setSoundEnabled are forward-declared at the top of
+  //  init() so the earlier-running render loop can reference them safely.)
   try {
     audio = window.AudioEngine ? new window.AudioEngine() : null;
     const SOUND_PREF_KEY = "ust.sound";
