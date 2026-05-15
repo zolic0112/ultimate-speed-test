@@ -18,21 +18,25 @@
       ["master", "音量", 0, 1, 0.01],
     ],
     "Ambient — 整體 & 包絡": [
-      ["ambient.gain", "Ambient 總音量", 0, 0.6, 0.01],
+      ["ambient.gain", "Ambient 總音量", 0, 0.8, 0.01],
       ["ambient.attack", "整體 Attack (s)", 0.5, 15, 0.1],
       ["ambient.release", "整體 Release (s)", 1, 20, 0.1],
       ["ambient.wetMix", "Reverb 濕度", 0, 1, 0.01],
       ["ambient.reverbSeconds", "Reverb 尾長 (s)", 1, 15, 0.5],
       ["ambient.reverbDecay", "Reverb 衰減曲線", 0.5, 5, 0.1],
+      ["ambient.lowShelfHz", "Low-shelf 拐點 (Hz)", 50, 400, 5],
+      ["ambient.lowShelfGain", "Low-shelf 增益 (dB)", -6, 12, 0.5],
     ],
     "Ambient — Layer 1 深層 sine drone": [
-      ["ambient.droneGain", "Drone 音量", 0, 1, 0.01],
-      ["ambient.drone1", "Drone 1 (Hz)", 30, 120, 0.5],
+      ["ambient.droneGain", "Drone 音量", 0, 1.2, 0.01],
+      ["ambient.drone1", "Drone 1 (Hz)", 20, 120, 0.5],
       ["ambient.drone2", "Drone 2 (Hz)", 30, 150, 0.5],
-      ["ambient.drone3", "Drone 3 (Hz)", 30, 180, 0.5],
-      ["ambient.drone4", "Drone 4 (Hz)", 30, 220, 0.5],
+      ["ambient.drone3", "Drone 3 (Hz)", 40, 180, 0.5],
+      ["ambient.drone4", "Drone 4 (Hz)", 50, 220, 0.5],
       ["ambient.droneDetune", "Detune 漂移 (cents)", 0, 30, 0.5],
       ["ambient.droneLfoRate", "Drift LFO 速度 (Hz)", 0.005, 0.3, 0.005],
+      ["ambient.subFreq", "Sub-oct 頻率 (Hz)", 15, 60, 0.5],
+      ["ambient.subGain", "Sub-oct 音量", 0, 0.5, 0.005],
     ],
     "Ambient — Layer 2 頌缽 FM 諧振": [
       ["ambient.bowlGain", "Bowl 音量", 0, 0.6, 0.01],
@@ -51,52 +55,125 @@
       ["ambient.airCutoffSweep", "LP sweep 深度 (Hz)", 0, 4000, 25],
       ["ambient.airSweepRate", "Sweep 速度 (Hz)", 0.005, 0.2, 0.005],
     ],
-    "Tunnel 隧道穿梭": [
-      ["tunnel.maxGain", "最大音量", 0, 0.6, 0.01],
-      ["tunnel.gainMult", "音量乘數", 0, 1, 0.01],
-      ["tunnel.minFreq", "最低 cutoff (Hz)", 50, 2000, 10],
-      ["tunnel.maxFreq", "最高 cutoff (Hz)", 500, 8000, 50],
-      ["tunnel.bpQ", "Bandpass Q", 0.1, 8, 0.05],
-      ["tunnel.hpFreq", "Highpass (Hz)", 20, 1500, 10],
+    "Tunnel — 整體 & 包絡": [
+      ["tunnel.outGain", "整體音量", 0, 1, 0.01],
+      ["tunnel.attack", "Attack (s)", 0.1, 5, 0.1],
+      ["tunnel.release", "Release (s)", 0.1, 5, 0.1],
     ],
-    "Forge 鑄造完成": [
-      ["forge.baseFreq", "基礎頻率 (Hz)", 100, 2000, 5],
+    "Tunnel — Layer 1 粒子流 (filtered noise)": [
+      ["tunnel.particleHP", "HP 起點 (Hz)", 200, 3000, 20],
+      ["tunnel.particleHPMax", "HP 全速 (Hz)", 800, 6000, 50],
+      ["tunnel.particleBP", "BP 起點 (Hz)", 500, 4000, 50],
+      ["tunnel.particleBPMax", "BP 全速 (Hz)", 2000, 10000, 100],
+      ["tunnel.particleQ", "BP Q", 0.5, 6, 0.05],
+      ["tunnel.particleGainBase", "粒子音量 idle", 0, 0.4, 0.005],
+      ["tunnel.particleGainMax", "粒子音量 全速", 0, 0.6, 0.005],
+    ],
+    "Tunnel — Layer 2 隧道體 (mass + Doppler)": [
+      ["tunnel.bodyFreqBase", "BP 中心 idle (Hz)", 80, 600, 5],
+      ["tunnel.bodyFreqMax", "BP 中心 全速 (Hz)", 100, 1000, 5],
+      ["tunnel.bodyQ", "BP Q", 0.5, 5, 0.05],
+      ["tunnel.bodyGainBase", "音量 idle", 0, 0.3, 0.005],
+      ["tunnel.bodyGainMax", "音量 全速", 0, 0.5, 0.005],
+      ["tunnel.bodyOsc1", "低 osc 1 (Hz)", 40, 250, 1],
+      ["tunnel.bodyOsc2", "低 osc 2 (Hz)", 60, 350, 1],
+      ["tunnel.bodyOscGain", "低 osc 音量", 0, 0.3, 0.005],
+      ["tunnel.dopplerCents", "Doppler 上行 (cents)", 0, 600, 5],
+    ],
+    "Tunnel — Layer 3 FM 能量壓縮": [
+      ["tunnel.fmCarrier", "Carrier (Hz)", 100, 1500, 5],
+      ["tunnel.fmRatio", "Modulator 比例 (×)", 0.5, 5, 0.005],
+      ["tunnel.fmDepthBase", "FM 深度 idle (Hz)", 0, 200, 5],
+      ["tunnel.fmDepthMax", "FM 深度 全速 (Hz)", 0, 800, 5],
+      ["tunnel.fmGainBase", "音量 idle", 0, 0.2, 0.005],
+      ["tunnel.fmGainMax", "音量 全速", 0, 0.3, 0.005],
+    ],
+    "Tunnel — Layer 4 空間 (reverb + stereo)": [
+      ["tunnel.reverbSeconds", "Reverb 尾長 (s)", 1, 8, 0.2],
+      ["tunnel.reverbDecay", "Reverb 衰減曲線", 0.5, 5, 0.1],
+      ["tunnel.wetMixBase", "Reverb idle", 0, 0.8, 0.01],
+      ["tunnel.wetMixMax", "Reverb 全速", 0, 1, 0.01],
+      ["tunnel.panRate", "Pan LFO (Hz)", 0.02, 1, 0.01],
+      ["tunnel.panDepthBase", "Pan 寬度 idle", 0, 1, 0.01],
+      ["tunnel.panDepthMax", "Pan 寬度 全速", 0, 1, 0.01],
+    ],
+    "Forge — 整體 & Reverb": [
       ["forge.outGain", "整體音量", 0, 1, 0.01],
-      ["forge.attack", "Attack (s)", 0.001, 0.1, 0.001],
-      ["forge.bendStart", "Pitch bend 起點 (×)", 0.5, 1, 0.01],
-      ["forge.bendTime", "Bend 時間 (s)", 0, 0.5, 0.005],
-      ["forge.partial1Ratio", "倍音 1 比例", 0.5, 5, 0.01],
-      ["forge.partial1Gain", "倍音 1 音量", 0, 1, 0.01],
-      ["forge.partial1Decay", "倍音 1 衰減 (s)", 0.1, 4, 0.05],
-      ["forge.partial2Ratio", "倍音 2 比例", 0.5, 6, 0.01],
-      ["forge.partial2Gain", "倍音 2 音量", 0, 1, 0.01],
-      ["forge.partial2Decay", "倍音 2 衰減 (s)", 0.1, 3, 0.05],
-      ["forge.partial3Ratio", "倍音 3 比例", 0.5, 8, 0.01],
-      ["forge.partial3Gain", "倍音 3 音量", 0, 1, 0.01],
-      ["forge.partial3Decay", "倍音 3 衰減 (s)", 0.1, 2, 0.05],
+      ["forge.reverbSeconds", "Reverb 尾長 (s)", 0.5, 6, 0.1],
+      ["forge.reverbDecay", "Reverb 衰減曲線", 0.5, 5, 0.1],
+      ["forge.wetMix", "Reverb 濕度", 0, 1, 0.01],
     ],
-    "Motion — 音域 & 包絡": [
-      ["motion.baseFreq", "靜止頻率 (Hz)", 100, 800, 1],
-      ["motion.maxFreq", "全速頻率 (Hz)", 200, 2500, 5],
-      ["motion.minGain", "起音音量", 0, 0.3, 0.005],
-      ["motion.maxGain", "全速音量", 0, 0.5, 0.005],
-      ["motion.sensitivity", "靈敏度", 0.01, 0.5, 0.005],
-      ["motion.floor", "靜音門檻", 0, 0.01, 0.0005],
-      ["motion.attack", "Pitch 跟隨 (s)", 0.005, 0.5, 0.005],
-      ["motion.gainAttack", "Gain 跟隨 (s)", 0.005, 0.5, 0.005],
-      ["motion.brightnessSensitivity", "亮度曲線", 0.2, 3, 0.05],
+    "Forge — Stage 1 Charge 蓄能": [
+      ["forge.chargeTime", "蓄能時間 (s)", 0.2, 2, 0.05],
+      ["forge.chargeAttack", "Attack (s)", 0.02, 0.5, 0.01],
+      ["forge.chargeStartFreq", "起始頻率 (Hz)", 60, 400, 2],
+      ["forge.chargeEndFreq", "終止頻率 (Hz)", 200, 1200, 5],
+      ["forge.chargeLPStart", "LP 起點 (Hz)", 100, 1500, 10],
+      ["forge.chargeLPEnd", "LP 終點 (Hz)", 1000, 8000, 50],
+      ["forge.chargeLPQ", "LP Q", 0.5, 10, 0.1],
+      ["forge.chargeGain", "音量", 0, 0.8, 0.01],
+      ["forge.chargeVibRate", "Vibrato 速度 (Hz)", 1, 15, 0.2],
+      ["forge.chargeVibDepth", "Vibrato 深度 (Hz)", 0, 25, 0.5],
     ],
-    "Motion — 倍音 (additive sines)": [
-      ["motion.p1Ratio", "倍音 1 比例", 0.5, 4, 0.01],
-      ["motion.p1Gain", "倍音 1 音量", 0, 1.5, 0.01],
-      ["motion.p2Ratio", "倍音 2 比例", 0.5, 5, 0.01],
-      ["motion.p2Gain", "倍音 2 音量", 0, 1, 0.01],
-      ["motion.p3Ratio", "倍音 3 比例", 0.5, 6, 0.01],
-      ["motion.p3Gain", "倍音 3 音量", 0, 1, 0.01],
-      ["motion.p4Ratio", "倍音 4 比例", 0.5, 9, 0.01],
-      ["motion.p4Gain", "倍音 4 音量", 0, 1, 0.01],
-      ["motion.fmRate", "FM 速度 (Hz)", 0.5, 20, 0.1],
-      ["motion.fmDepth", "FM 深度 (Hz)", 0, 30, 0.1],
+    "Forge — Stage 2 Release 釋放": [
+      ["forge.releaseOverlap", "與 charge 重疊 (s)", 0, 0.5, 0.01],
+      ["forge.releaseTime", "釋放長度 (s)", 0.15, 1.2, 0.02],
+      ["forge.releaseGain", "音量", 0, 0.6, 0.01],
+      ["forge.releaseBPStart", "BP 起點 (Hz)", 500, 4000, 50],
+      ["forge.releaseBPEnd", "BP 終點 (Hz)", 1500, 8000, 50],
+      ["forge.releaseBPQ", "BP Q", 0.3, 5, 0.05],
+      ["forge.releaseHP", "HP cutoff (Hz)", 200, 2500, 25],
+      ["forge.releaseShimmerBase", "Shimmer 基頻 (Hz)", 800, 4000, 25],
+      ["forge.releaseShimmerGain", "Shimmer 音量", 0, 0.4, 0.005],
+    ],
+    "Forge — Stage 3 Metal 金屬定型": [
+      ["forge.metalDelay", "延遲開始 (s)", 0, 0.8, 0.02],
+      ["forge.metalAttack", "Attack (s)", 0.001, 0.1, 0.001],
+      ["forge.metalDecay", "Decay (s)", 0.3, 4, 0.05],
+      ["forge.metalGain", "音量", 0, 1, 0.01],
+      ["forge.metalBase", "基頻 (Hz)", 300, 2000, 5],
+      ["forge.metalModRatio", "FM 比例 (×)", 0.5, 4, 0.005],
+      ["forge.metalModDepth", "FM 深度 (Hz)", 0, 300, 1],
+      ["forge.metalP1Ratio", "Partial 1 比例", 0.5, 4, 0.01],
+      ["forge.metalP1Gain", "Partial 1 音量", 0, 1.5, 0.01],
+      ["forge.metalP2Ratio", "Partial 2 比例", 0.5, 5, 0.01],
+      ["forge.metalP2Gain", "Partial 2 音量", 0, 1, 0.01],
+      ["forge.metalP3Ratio", "Partial 3 比例", 0.5, 6, 0.01],
+      ["forge.metalP3Gain", "Partial 3 音量", 0, 1, 0.01],
+    ],
+    "Medal Pluck — 觸發 & 音域": [
+      ["medal.threshold", "觸發門檻", 0, 0.02, 0.0005],
+      ["medal.sensitivity", "靈敏度 (歸一)", 0.005, 0.2, 0.001],
+      ["medal.minInterval", "最小間隔 (s)", 0.02, 0.4, 0.005],
+      ["medal.basePitch", "最低音 (Hz)", 200, 2000, 5],
+      ["medal.maxPitch", "最高音 (Hz)", 400, 4000, 10],
+      ["medal.pitchBend", "Pitch bend 終點 (×)", 0.85, 1.0, 0.005],
+    ],
+    "Medal Pluck — 包絡 & 音量": [
+      ["medal.outGain", "整體音量", 0, 1, 0.01],
+      ["medal.gainMin", "低速音量比", 0, 1, 0.01],
+      ["medal.gainMax", "全速音量比", 0, 1, 0.01],
+      ["medal.attack", "Attack (s)", 0.001, 0.05, 0.001],
+      ["medal.decay", "基準 decay (s)", 0.1, 1.5, 0.02],
+    ],
+    "Medal Pluck — 倍音 (additive sines)": [
+      ["medal.p1Ratio", "倍音 1 比例", 0.5, 4, 0.01],
+      ["medal.p1Gain", "倍音 1 音量", 0, 1.5, 0.01],
+      ["medal.p1Decay", "倍音 1 衰減 (s)", 0.05, 2, 0.02],
+      ["medal.p2Ratio", "倍音 2 比例", 0.5, 5, 0.01],
+      ["medal.p2Gain", "倍音 2 音量", 0, 1, 0.01],
+      ["medal.p2Decay", "倍音 2 衰減 (s)", 0.05, 1.5, 0.02],
+      ["medal.p3Ratio", "倍音 3 比例", 0.5, 6, 0.01],
+      ["medal.p3Gain", "倍音 3 音量", 0, 1, 0.01],
+      ["medal.p3Decay", "倍音 3 衰減 (s)", 0.05, 1, 0.02],
+      ["medal.p4Ratio", "倍音 4 比例", 0.5, 9, 0.01],
+      ["medal.p4Gain", "倍音 4 音量", 0, 1, 0.01],
+      ["medal.p4Decay", "倍音 4 衰減 (s)", 0.05, 1, 0.02],
+    ],
+    "Medal Pluck — Reverb tail": [
+      ["medal.reverbSeconds", "Reverb 尾長 (s)", 0.3, 5, 0.1],
+      ["medal.reverbDecay", "Reverb 衰減曲線", 1, 6, 0.1],
+      ["medal.wetMix", "Reverb 濕度", 0, 1, 0.01],
     ],
   };
 
@@ -129,24 +206,22 @@
       }, 200);
     }
   }
-  function restartMotion(eng) {
-    if (eng._motion) {
-      eng.stopMotion();
-      setTimeout(() => eng.startMotion(), 200);
-    }
+  // Medal pluck is event-triggered, no continuous state to restart.
+  // Params take effect on the NEXT pluck — except reverb (rebuilt at first
+  // pluck after stopMotion/clearReverb).
+  function clearMedalReverb(eng) {
+    if (eng._medalReverb) eng._medalReverb = null;
   }
 
-  // What to do after a param changes, depending on which sound it belongs to.
   const APPLY = {
     master: (eng) => eng.applyMaster(),
     ambient: (eng) => restartAmbient(eng),
     tunnel: (eng) => restartTunnel(eng),
-    forge: () => {}, // forge is one-shot; play again to hear
-    motion: (eng) => restartMotion(eng),
+    forge: () => {}, // one-shot
+    medal: (eng) => clearMedalReverb(eng), // reverb rebuilds at next pluck
   };
 
-  let motionTestVel = 0;
-  let motionTestTimer = null;
+  let pluckTestVel = 0;
 
   function buildPanel() {
     const panel = document.createElement("div");
@@ -198,7 +273,7 @@
       eng.applyMaster();
       restartAmbient(eng);
       restartTunnel(eng);
-      restartMotion(eng);
+      clearMedalReverb(eng);
     });
     head.appendChild(copyBtn);
     head.appendChild(resetBtn);
@@ -208,7 +283,7 @@
     const transportSpec = [
       { key: "ambient", label: "Ambient", toggle: true },
       { key: "tunnel", label: "Tunnel (intensity 0.7)", toggle: true },
-      { key: "motion", label: "Motion (test velocity)", toggle: true, hasSlider: true },
+      { key: "medal", label: "Medal Pluck", oneShot: true, hasSlider: true },
       { key: "forge", label: "Forge bell", oneShot: true },
     ];
 
@@ -228,7 +303,9 @@
           "background:#357;color:#fff;border:0;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;";
         btn.addEventListener("click", () => {
           const eng = getEngine();
-          if (eng) eng.playForgeComplete();
+          if (!eng) return;
+          if (t.key === "forge") eng.playForgeComplete();
+          if (t.key === "medal") eng.playPluck(pluckTestVel || 0.5);
         });
         row.appendChild(btn);
       } else {
@@ -244,13 +321,6 @@
             eng.startTunnel();
             eng.setTunnelIntensity(0.7);
           }
-          if (t.key === "motion") {
-            eng.startMotion();
-            if (motionTestTimer) clearInterval(motionTestTimer);
-            motionTestTimer = setInterval(() => {
-              eng.setMotionVelocity(motionTestVel);
-            }, 50);
-          }
         });
         const stopBtn = document.createElement("button");
         stopBtn.textContent = "■";
@@ -261,13 +331,6 @@
           if (!eng) return;
           if (t.key === "ambient") eng.stopAmbient();
           if (t.key === "tunnel") eng.stopTunnel();
-          if (t.key === "motion") {
-            eng.stopMotion();
-            if (motionTestTimer) {
-              clearInterval(motionTestTimer);
-              motionTestTimer = null;
-            }
-          }
         });
         row.appendChild(playBtn);
         row.appendChild(stopBtn);
@@ -275,26 +338,27 @@
       panel.appendChild(row);
 
       if (t.hasSlider) {
-        // Motion velocity test slider — simulates angular speed
+        // Pluck intensity test slider — 0..1, drives playPluck() directly
         const sliderRow = document.createElement("div");
         sliderRow.style.cssText =
           "display:flex;gap:6px;align-items:center;margin:2px 0 8px 12px;font-size:10px;";
         const sLbl = document.createElement("span");
-        sLbl.textContent = "速度";
+        sLbl.textContent = "強度";
         sLbl.style.cssText = "width:30px;color:#aaa;";
         const slider = document.createElement("input");
         slider.type = "range";
         slider.min = "0";
-        slider.max = "0.2";
-        slider.step = "0.001";
-        slider.value = "0";
+        slider.max = "1";
+        slider.step = "0.01";
+        slider.value = "0.5";
         slider.style.cssText = "flex:1;";
         const val = document.createElement("span");
-        val.textContent = "0.000";
+        val.textContent = "0.50";
         val.style.cssText = "width:48px;text-align:right;font-family:monospace;";
+        pluckTestVel = 0.5;
         slider.addEventListener("input", () => {
-          motionTestVel = parseFloat(slider.value);
-          val.textContent = motionTestVel.toFixed(3);
+          pluckTestVel = parseFloat(slider.value);
+          val.textContent = pluckTestVel.toFixed(2);
         });
         sliderRow.appendChild(sLbl);
         sliderRow.appendChild(slider);
