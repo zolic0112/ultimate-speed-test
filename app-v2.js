@@ -186,21 +186,13 @@ function init() {
   // bit extra but it's negligible compared to seeing a black bar.)
   const BLEED = 400; // 400px bleed: enough to cover home indicator on any iOS
   const forceFullBleed = () => {
-    // Use the LARGEST of all available dimension sources, since each one
-    // can under-report in different iOS PWA situations:
-    //   screen.{w,h}          → physical pixels (usually largest)
-    //   innerWidth/Height     → CSS pixels of viewport (excludes safe-area on iOS)
-    //   documentElement       → may match either
-    const w = Math.max(
-      screen.width || 0,
-      innerWidth || 0,
-      document.documentElement.clientWidth || 0,
-    );
-    const h = Math.max(
-      screen.height || 0,
-      innerHeight || 0,
-      document.documentElement.clientHeight || 0,
-    );
+    // Use VIEWPORT dimensions (innerWidth/innerHeight) — these are reliable
+    // now that body is position:fixed + html is 100lvh (innerHeight reports
+    // the layout viewport including safe-area on iOS PWA). screen.* would
+    // be wrong on desktop browsers (= physical monitor size, much bigger
+    // than the window), causing the canvas to position far off-center.
+    const w = innerWidth || document.documentElement.clientWidth || 0;
+    const h = innerHeight || document.documentElement.clientHeight || 0;
     const totalW = w + BLEED;
     const totalH = h + BLEED;
 
@@ -256,7 +248,7 @@ function init() {
       navigator.standalone ||
       window.matchMedia("(display-mode: standalone)").matches;
     dbg.textContent =
-      `v79 PWA:${standalone ? "Y" : "N"} ` +
+      `v80 PWA:${standalone ? "Y" : "N"} ` +
       `scr:${screen.width}×${screen.height} ` +
       `inr:${innerWidth}×${innerHeight} ` +
       `cnv:${totalW}×${totalH} off:-${BLEED / 2}`;
@@ -275,17 +267,9 @@ function init() {
     forceFullBleed();
     // GL buffer size matches the inline-styled CSS pixels (with dpr).
     const w =
-      Math.max(
-        screen.width || 0,
-        innerWidth || 0,
-        document.documentElement.clientWidth || 0,
-      ) + BLEED;
+      (innerWidth || document.documentElement.clientWidth || 0) + BLEED;
     const h =
-      Math.max(
-        screen.height || 0,
-        innerHeight || 0,
-        document.documentElement.clientHeight || 0,
-      ) + BLEED;
+      (innerHeight || document.documentElement.clientHeight || 0) + BLEED;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     if (renderer) {
