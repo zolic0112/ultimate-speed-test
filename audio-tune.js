@@ -155,6 +155,8 @@
       ["medal.gainMax", "全速音量比", 0, 1, 0.01],
       ["medal.attack", "Attack (s)", 0.001, 0.05, 0.001],
       ["medal.decay", "基準 decay (s)", 0.1, 1.5, 0.02],
+      ["medal.lpCutoff", "Lowpass cutoff (Hz)", 400, 8000, 50],
+      ["medal.lpQ", "Lowpass Q", 0.3, 5, 0.05],
     ],
     "Medal Pluck — 倍音 (additive sines)": [
       ["medal.p1Ratio", "倍音 1 比例", 0.5, 4, 0.01],

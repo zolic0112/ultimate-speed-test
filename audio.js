@@ -170,46 +170,50 @@
     },
     medal: {
       // "Pluck" character — short metallic ring per rotation event.
-      // Each pluck is an additive sine burst with quick attack and short
-      // decay, routed through a small reverb tail so the ring lingers
-      // briefly. Triggered (NOT continuous) — driven by velocity events
-      // from the medal rotation, throttled to minInterval per pluck.
+      // Throttled to minInterval so dragging produces a sparser, less
+      // intrusive 'ting' cadence rather than a continuous shower.
 
-      // ─ trigger gating ─
-      threshold: 0.003, // velocity below this fires no pluck
-      sensitivity: 0.05, // velocity normalization divisor → 0..1
-      minInterval: 0.07, // seconds between plucks (max ~14 plucks/sec)
+      // ─ trigger gating (rarer + needs more force) ─
+      threshold: 0.006, // 2× higher than before — needs a real movement
+      sensitivity: 0.05,
+      minInterval: 0.18, // 180ms (was 70ms): ~5.5 plucks/sec max instead of 14
 
-      // ─ pitch ─
-      basePitch: 880, // slowest pluck pitch (Hz)
-      maxPitch: 2200, // fastest pluck pitch
-      pitchBend: 0.96, // each pluck bends down to 96% of pitch over decay
+      // ─ pitch (one octave down for mellower, less shrill tone) ─
+      basePitch: 440,
+      maxPitch: 1100,
+      pitchBend: 0.95, // a touch more bend for sustain feel
 
-      // ─ envelope / output ─
+      // ─ envelope / output (shorter, snappier) ─
       attack: 0.003,
-      decay: 0.45, // fundamental decay (sec)
+      decay: 0.25, // was 0.45 — much shorter overall ring
       outGain: 0.5,
-      gainMin: 0.4, // gain scaling at velocity threshold
-      gainMax: 1.0, // gain scaling at full velocity
+      gainMin: 0.4,
+      gainMax: 1.0,
 
-      // ─ partials (sine additive — slightly inharmonic for metallic ring) ─
+      // ─ Lowpass on the pluck bus — keeps it warm, rolls off the
+      //   shrill sparkle. Filter Q adds a subtle resonance "shape".
+      lpCutoff: 2800,
+      lpQ: 0.9,
+
+      // ─ partials — keep slight inharmonicity for metal character, but
+      //   pull upper partials' gain WAY down for mellow timbre ─
       p1Ratio: 1.0,
       p1Gain: 1.0,
-      p1Decay: 0.45, // bottom rings longest
+      p1Decay: 0.28, // fundamental still rings longest
       p2Ratio: 2.01,
-      p2Gain: 0.55,
-      p2Decay: 0.32,
+      p2Gain: 0.42, // gentle 2nd harmonic
+      p2Decay: 0.20,
       p3Ratio: 3.07,
-      p3Gain: 0.35,
-      p3Decay: 0.22,
+      p3Gain: 0.16, // was 0.35 — much quieter upper partial
+      p3Decay: 0.14,
       p4Ratio: 5.13,
-      p4Gain: 0.18,
-      p4Decay: 0.18, // top sparkle dies fast
+      p4Gain: 0.06, // was 0.18 — barely there sparkle
+      p4Decay: 0.10,
 
-      // ─ reverb send (short metallic tail — Sonic ring feel) ─
-      reverbSeconds: 1.6,
-      reverbDecay: 3.2,
-      wetMix: 0.55, // how much of pluck goes to reverb
+      // ─ reverb tail (shorter to match shorter plucks) ─
+      reverbSeconds: 1.0,
+      reverbDecay: 3.0,
+      wetMix: 0.45, // a bit less wet
     },
   };
 
@@ -979,11 +983,21 @@
 
       const reverb = this._ensureMedalReverb();
 
-      // Per-pluck output node — drives dry path + reverb send
+      // Per-pluck output bus.
+      // Topology:  partials → lowpass (mellow) → out → master  (dry)
+      //            partials → lowpass → out → reverb.input    (wet)
+      // The lowpass tames the shrillness coming from the upper inharmonic
+      // partials so the pluck sounds warm/mellow but still metallic.
       const out = ctx.createGain();
       out.gain.value = p.outGain * (p.gainMin + norm * (p.gainMax - p.gainMin));
-      out.connect(this.master); // dry
-      out.connect(reverb.input); // wet via shared reverb
+      out.connect(this.master);
+      out.connect(reverb.input);
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = p.lpCutoff;
+      lp.Q.value = p.lpQ;
+      lp.connect(out);
 
       const pitch = p.basePitch + norm * (p.maxPitch - p.basePitch);
       const partials = [
@@ -997,7 +1011,6 @@
         const o = ctx.createOscillator();
         o.type = "sine";
         const f = pitch * pt.ratio;
-        // Slight downward pitch bend over the decay — "pluck" feel
         o.frequency.setValueAtTime(f, now);
         o.frequency.exponentialRampToValueAtTime(
           f * p.pitchBend,
@@ -1007,7 +1020,7 @@
         g.gain.setValueAtTime(0, now);
         g.gain.linearRampToValueAtTime(pt.gain, now + p.attack);
         g.gain.exponentialRampToValueAtTime(0.0001, now + pt.decay);
-        o.connect(g).connect(out);
+        o.connect(g).connect(lp); // routed through lowpass
         o.start(now);
         o.stop(now + pt.decay + 0.05);
       });
