@@ -70,6 +70,12 @@ body {
     font-feature-settings: "ss01", "ss02", "tnum";
     -webkit-font-smoothing: antialiased;
     user-select: none;
+    -webkit-user-select: none;
+    /* iOS PWA: long-press otherwise pops the system text-selection / callout
+       menu. Web browsers respect user-select:none already; PWA standalone
+       needs this explicit Apple-prefixed property to suppress the callout. */
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
     /* `none` here disables document-wide scrolling. Individual scroll
        containers (like #screen-result on mobile) re-enable touch-action
        via their own rules. */

@@ -504,8 +504,18 @@
       // that isn't focusable. Make it focusable but not in the tab order.
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
 
+      // Mobile gets a more "kinetic" feel: drag sensitivity scales with the
+      // pointer speed (light flick = light spin, hard flick = fast spin) and
+      // the released velocity persists as inertia rather than dying instantly.
+      const isMobile =
+        innerWidth < 768 ||
+        (typeof matchMedia !== "undefined" &&
+          matchMedia("(pointer: coarse)").matches);
+      this._isMobileInput = isMobile;
+
       const pointers = new Map();
       let pinchDist = 0;
+      let lastMoveT = 0;
       const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
       let _moveCount = 0;
@@ -519,6 +529,13 @@
              a backup so drag still works without capture. */
         }
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        this._pointersActive = pointers.size;
+        // Stop any existing inertia spin when user grabs the medal
+        if (this._inertiaVel) {
+          this._inertiaVel.x = 0;
+          this._inertiaVel.y = 0;
+        }
+        lastMoveT = performance.now();
         if (pointers.size === 2) {
           const [a, b] = [...pointers.values()];
           pinchDist = dist(a, b);
@@ -536,8 +553,30 @@
         if (pointers.size === 1) {
           const dx = cur.x - prev.x,
             dy = cur.y - prev.y;
-          this.rotVel.y = dx * 0.006;
-          this.rotVel.x = dy * 0.006;
+          const now = performance.now();
+          const dtMs = Math.max(1, now - lastMoveT);
+          lastMoveT = now;
+
+          if (isMobile) {
+            // Mobile: speed-proportional sensitivity. A 1px nudge at 120ms
+            // intervals scales tiny; a 30px swipe at 8ms intervals scales
+            // 5-6× — the medal really kicks when you flick it.
+            // pixels/ms = pointer speed; multiplier ramps from ~1 (slow) to
+            // ~4 (fast 4 px/ms swipe).
+            const speed = Math.hypot(dx, dy) / dtMs;
+            const boost = 1 + Math.min(speed * 1.2, 3.0);
+            const factor = 0.012 * boost; // base 2× the desktop sensitivity
+            this.rotVel.y = dx * factor;
+            this.rotVel.x = dy * factor;
+            // Remember the most recent velocity so we can coast after release
+            this._inertiaVel = this._inertiaVel || { x: 0, y: 0 };
+            this._inertiaVel.x = this.rotVel.x;
+            this._inertiaVel.y = this.rotVel.y;
+          } else {
+            // Desktop: keep the original light, controlled feel
+            this.rotVel.y = dx * 0.006;
+            this.rotVel.x = dy * 0.006;
+          }
           this.rotTarget.y += this.rotVel.y;
           this.rotTarget.x += this.rotVel.x;
           this.rotTarget.x = Math.max(-0.9, Math.min(0.9, this.rotTarget.x));
@@ -557,6 +596,7 @@
 
       const release = (e) => {
         pointers.delete(e.pointerId);
+        this._pointersActive = pointers.size;
         if (pointers.size < 2) pinchDist = 0;
         _moveCount = 0;
       };
@@ -929,10 +969,38 @@
 
         // ---- Auto-rotate + spring toward interaction target ----
         this.rotTarget.y += 0.0028;
-        this.body.rotation.y +=
-          (this.rotTarget.y - this.body.rotation.y) * 0.08;
-        this.body.rotation.x +=
-          (this.rotTarget.x - this.body.rotation.x) * 0.08;
+
+        // Mobile: kinetic inertia after release. _inertiaVel is set during
+        // drag; once the user lifts their finger (no pointers in the Map),
+        // the velocity continues to drive rotTarget and decays to a stop.
+        // This is what gives "harder flick = longer spin" — the very feel
+        // a heavy damped spring (0.08 below) was killing.
+        if (this._isMobileInput && this._inertiaVel) {
+          const noPointer =
+            !this._pointersActive || this._pointersActive === 0;
+          if (
+            noPointer &&
+            (Math.abs(this._inertiaVel.x) > 0.0001 ||
+              Math.abs(this._inertiaVel.y) > 0.0001)
+          ) {
+            this.rotTarget.y += this._inertiaVel.y;
+            this.rotTarget.x += this._inertiaVel.x;
+            this.rotTarget.x = Math.max(
+              -0.9,
+              Math.min(0.9, this.rotTarget.x),
+            );
+            // Friction: 0.96/frame ≈ ~0.5s coast time at 60fps. Lower = stops
+            // sooner, higher = longer coast. 0.96 feels natural for a puck.
+            this._inertiaVel.x *= 0.96;
+            this._inertiaVel.y *= 0.96;
+          }
+        }
+
+        // Damping factor: 0.08 felt heavy on mobile (~12 frames to catch up).
+        // 0.2 on mobile makes the medal track the finger almost 1:1.
+        const damp = this._isMobileInput ? 0.2 : 0.08;
+        this.body.rotation.y += (this.rotTarget.y - this.body.rotation.y) * damp;
+        this.body.rotation.x += (this.rotTarget.x - this.body.rotation.x) * damp;
 
         // ---- Gentle float, honouring the auto-centre offset ----
         this.body.position.x = this._centerOffset.x;
